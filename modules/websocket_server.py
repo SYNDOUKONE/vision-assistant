@@ -48,6 +48,7 @@ async def ws_handler(websocket):
                 elif msg_type == "stop_audio":
                     state.STOP_PARLER = True
                     print("[MOBILE] Signal STOP audio recu")
+                    asyncio.ensure_future(stop_web_youtube())
 
                 elif msg_type in ["screen_frame", "webcam_frame"]:
                     req_id = data.get("id")
@@ -57,7 +58,10 @@ async def ws_handler(websocket):
                             fut.set_exception(Exception(data["error"]))
                         else:
                             fut.set_result(data["data"])
-                    print(f"[VISION] {data.get('type')} recue pour ID: {req_id}")
+                        print(f"[VISION] {data.get('type')} recue et traitee pour ID: {req_id}")
+                    else:
+                        # On ignore les frames pour des IDs déjà traités ou inconnus
+                        pass
 
                 elif msg_type == "get_history_ui":
                     msg = json.dumps({"action": "history_ui", "history": state.history_ui})
@@ -115,6 +119,44 @@ async def send_web_carte(show: bool):
     """Affiche ou cache la carte 3D holographique dans le frontend."""
     if state.CONNECTED_CLIENTS:
         message = json.dumps({"action": "show_carte" if show else "hide_carte"})
+        await asyncio.gather(
+            *[ws.send(message) for ws in state.CONNECTED_CLIENTS],
+            return_exceptions=True
+        )
+
+
+async def send_web_youtube(video_id: str, title: str = ""):
+    """Envoie une vidéo / musique à jouer directement dans l'interface web (embed)."""
+    if state.CONNECTED_CLIENTS:
+        message = json.dumps({
+            "action": "play_youtube",
+            "videoId": video_id,
+            "title": title
+        })
+        await asyncio.gather(
+            *[ws.send(message) for ws in state.CONNECTED_CLIENTS],
+            return_exceptions=True
+        )
+
+
+async def stop_web_youtube():
+    """Arrête la lecture de la musique dans l'interface web."""
+    if state.CONNECTED_CLIENTS:
+        message = json.dumps({"action": "stop_youtube"})
+        await asyncio.gather(
+            *[ws.send(message) for ws in state.CONNECTED_CLIENTS],
+            return_exceptions=True
+        )
+
+
+async def send_web_audio(audio_url: str, title: str = ""):
+    """Envoie un fichier audio à jouer directement dans l'interface web."""
+    if state.CONNECTED_CLIENTS:
+        message = json.dumps({
+            "action": "play_audio",
+            "url": audio_url,
+            "title": title
+        })
         await asyncio.gather(
             *[ws.send(message) for ws in state.CONNECTED_CLIENTS],
             return_exceptions=True

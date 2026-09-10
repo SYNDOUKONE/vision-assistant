@@ -163,62 +163,50 @@ async def vision_voir_utilisateur(question):
         state.is_thinking = True
         await send_web_state("thinking")
 
-        response = gemini_client.models.generate_content(model=CHOSEN_MODEL, contents=[prompt, img])
-        rep = response.text.strip()
+        try:
+            response = gemini_client.models.generate_content(model=CHOSEN_MODEL, contents=[prompt, img])
+            rep = response.text.strip()
+        except Exception as e:
+            err_msg = str(e).lower()
+            print(f"[GEMINI ERROR] {e}")
+
+            if "429" in err_msg or "quota" in err_msg or "resource_exhausted" in err_msg:
+                fallback_msg = "Mon quota d'analyse d'image Gemini est épuisé pour le moment."
+            else:
+                fallback_msg = f"Une erreur technique est survenue avec Gemini ({type(e).__name__})."
+
+            from modules.ai_brain import demander_grok, demander_groq, demander_ollama
+            print("[VISION] Bascule sur Grok pour le secours textuel...")
+            rep = await demander_grok(f"Syndou demande : {question}. Je ne peux pas voir l'image à cause de : {fallback_msg}. Réponds avec empathie que tu es temporairement aveugle mais que tu es toujours là pour lui.")
+
+            if not rep:
+                print("[VISION] Grok a échoué, tentative avec Groq...")
+                rep = await demander_groq(f"Syndou demande : {question}. Je ne peux pas voir l'image à cause de : {fallback_msg}. Réponds avec empathie que tu es temporairement aveugle mais que tu es toujours là pour lui.")
+
+            if not rep:
+                print("[VISION] Groq a échoué, tentative avec Ollama (Local)...")
+                rep = await demander_ollama(f"Syndou demande : {question}. Je ne peux pas voir l'image à cause de : {fallback_msg}. Réponds avec empathie que tu es temporairement aveugle mais que tu es toujours là pour lui.")
+
+            if not rep:
+                print("[VISION] Tous les secours textuels ont échoué.")
+                return f"Désolé Syndou, je suis temporairement aveugle : {fallback_msg}"
 
         state.historique.append(genai_types.Content(role="user", parts=[genai_types.Part(text=f"[Webcam] {question}")]))
         state.historique.append(genai_types.Content(role="model", parts=[genai_types.Part(text=rep)]))
 
         return rep
     except Exception as e:
-        print(f"[WEBCAM ERROR] {e}")
-        return "Je n'ai pas pu accéder à votre image caméra pour le moment."
+        print(f"[WEBCAM CRITICAL ERROR] {e}")
+        print(f"[DEBUG] Error type: {type(e)} | Error value: {e}")
+        return f"Je n'ai pas pu accéder à votre image caméra pour le moment. (Erreur: {type(e).__name__})"
     finally:
         state.is_thinking = False
         await send_web_state("idle")
 
 
 async def vision_reconnaitre_personne():
-    try:
-        img_b64 = await request_webcam_capture()
-        if not img_b64:
-            return "Je ne vois rien, la caméra est inaccessible."
-
-        img_data = base64.b64decode(img_b64)
-        img = Image.open(io.BytesIO(img_data))
-        
-        # Load reference photos
-        contents = [
-            "Tu es VISION. Ton but est d'identifier la personne sur cette image webcam fournie à la fin.",
-            "Voici les photos de référence des personnes connues :"
-        ]
-        
-        faces_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "faces")
-        if os.path.exists(faces_dir):
-            for file in os.listdir(faces_dir):
-                if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                    try:
-                        ref_img = Image.open(os.path.join(faces_dir, file))
-                        name = os.path.splitext(file)[0].replace('_', ' ')
-                        contents.append(f"Photo de référence pour : {name}")
-                        contents.append(ref_img)
-                    except Exception:
-                        pass
-
-        contents.append("Voici maintenant l'image de la webcam à analyser. Dis-moi de qui il s'agit, ou signale si c'est une personne inconnue.")
-        contents.append(img)
-
-        state.is_thinking = True
-        await send_web_state("thinking")
-        
-        response = gemini_client.models.generate_content(model=CHOSEN_MODEL, contents=contents)
-        return response.text.strip()
-    except Exception as e:
-        print(f"[VISION ERROR RECOGNIZE] {e}")
-        return "Erreur lors de la reconnaissance de la personne."
-    finally:
-        state.is_thinking = False
-        await send_web_state("idle")
+    from modules.face_recognition_system import reconnaitre_personne
+    return await reconnaitre_personne()
 
 
 async def vision_analyser_objet(question):
@@ -229,14 +217,39 @@ async def vision_analyser_objet(question):
 
         img_data = base64.b64decode(img_b64)
         img = Image.open(io.BytesIO(img_data))
-        
+
         prompt = f"L'utilisateur pointe un objet devant la webcam. Analyse précisément l'image et l'objet mis en évidence. Question : {question}"
-        
+
         state.is_thinking = True
         await send_web_state("thinking")
-        
-        response = gemini_client.models.generate_content(model=CHOSEN_MODEL, contents=[prompt, img])
-        return response.text.strip()
+
+        try:
+            response = gemini_client.models.generate_content(model=CHOSEN_MODEL, contents=[prompt, img])
+            rep = response.text.strip()
+        except Exception as e:
+            err_msg = str(e).lower()
+            print(f"[GEMINI ERROR] {e}")
+            if "429" in err_msg or "quota" in err_msg or "resource_exhausted" in err_msg:
+                fallback_msg = "Mon quota d'analyse d'image Gemini est épuisé pour le moment."
+            else:
+                fallback_msg = f"Une erreur technique est survenue avec Gemini ({type(e).__name__})."
+
+            from modules.ai_brain import demander_grok, demander_groq, demander_ollama
+            print("[VISION] Bascule sur Grok pour le secours textuel...")
+            rep = await demander_grok(f"L'utilisateur demande d'analyser un objet : {question}. Je ne peux pas voir l'image à cause de : {fallback_msg}. Réponds avec empathie que tu es temporairement aveugle.")
+
+            if not rep:
+                print("[VISION] Grok a échoué, tentative avec Groq...")
+                rep = await demander_groq(f"L'utilisateur demande d'analyser un objet : {question}. Je ne peux pas voir l'image à cause de : {fallback_msg}. Réponds avec empathie que tu es temporairement aveugle.")
+
+            if not rep:
+                print("[VISION] Groq a échoué, tentative avec Ollama (Local)...")
+                rep = await demander_ollama(f"L'utilisateur demande d'analyser un objet : {question}. Je ne peux pas voir l'image à cause de : {fallback_msg}. Réponds avec empathie que tu es temporairement aveugle.")
+
+            if not rep:
+                return f"Désolé Syndou, je ne peux pas analyser cet objet : {fallback_msg}"
+
+        return rep
     except Exception as e:
         print(f"[VISION ERROR OBJECT] {e}")
         return "J'ai eu un souci pour analyser cet objet."

@@ -219,5 +219,13 @@ async def parler(texte, style="doux"):
     # ── Envoyer le texte au frontend pour affichage ──
     await send_web_text("", texte_tts)
 
+    # ── Affichage Overlay HUD Flottant ──
+    try:
+        from modules.overlay import afficher_texte_hud
+        afficher_texte_hud(texte_tts)
+    except Exception:
+        pass
+
     # Placer la parole dans la queue thread-safe
     speech_queue.put((texte_tts, style, state._skip_pc_audio))
+

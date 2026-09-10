@@ -4,6 +4,7 @@ Opérations sur les fichiers et dossiers locaux.
 """
 
 import os
+import sys
 import time
 import shutil
 import subprocess
@@ -19,18 +20,19 @@ def resoudre_chemin(chemin):
     if not chemin:
         return None
     chemin = chemin.strip().strip('"').strip("'")
+    user_home = os.environ.get("USERPROFILE") or os.environ.get("HOME") or os.path.expanduser("~")
     raccourcis = {
-        "bureau": os.path.join(os.environ.get("USERPROFILE", ""), "Desktop"),
-        "desktop": os.path.join(os.environ.get("USERPROFILE", ""), "Desktop"),
-        "documents": os.path.join(os.environ.get("USERPROFILE", ""), "Documents"),
-        "telechargement": os.path.join(os.environ.get("USERPROFILE", ""), "Downloads"),
-        "telechargements": os.path.join(os.environ.get("USERPROFILE", ""), "Downloads"),
-        "downloads": os.path.join(os.environ.get("USERPROFILE", ""), "Downloads"),
-        "images": os.path.join(os.environ.get("USERPROFILE", ""), "Pictures"),
-        "photos": os.path.join(os.environ.get("USERPROFILE", ""), "Pictures"),
-        "videos": os.path.join(os.environ.get("USERPROFILE", ""), "Videos"),
-        "musique": os.path.join(os.environ.get("USERPROFILE", ""), "Music"),
-        "music": os.path.join(os.environ.get("USERPROFILE", ""), "Music"),
+        "bureau": os.path.join(user_home, "Desktop"),
+        "desktop": os.path.join(user_home, "Desktop"),
+        "documents": os.path.join(user_home, "Documents"),
+        "telechargement": os.path.join(user_home, "Downloads"),
+        "telechargements": os.path.join(user_home, "Downloads"),
+        "downloads": os.path.join(user_home, "Downloads"),
+        "images": os.path.join(user_home, "Pictures"),
+        "photos": os.path.join(user_home, "Pictures"),
+        "videos": os.path.join(user_home, "Videos"),
+        "musique": os.path.join(user_home, "Music"),
+        "music": os.path.join(user_home, "Music"),
     }
     chemin_resolu = raccourcis.get(chemin.lower(), chemin)
 
@@ -57,14 +59,21 @@ def trouver_extension(ext):
 
 
 def ouvrir_navigateur(url):
-    """Force l'ouverture d'une URL dans Google Chrome."""
-    chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-    if os.path.exists(chrome_path):
+    """Force l'ouverture d'une URL dans le navigateur."""
+    if sys.platform == 'darwin':
         try:
-            subprocess.Popen([chrome_path, url])
+            subprocess.Popen(["open", url])
             return True
         except Exception as e:
-            print(f"[NAVIGATEUR] Erreur Chrome : {e}")
+            print(f"[NAVIGATEUR] Erreur mac open : {e}")
+    elif os.name == 'nt':
+        chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+        if os.path.exists(chrome_path):
+            try:
+                subprocess.Popen([chrome_path, url])
+                return True
+            except Exception as e:
+                print(f"[NAVIGATEUR] Erreur Chrome : {e}")
     webbrowser.open(url)
     return True
 
@@ -74,7 +83,12 @@ def ouvrir_dossier(chemin):
     if not chemin_resolu or not os.path.exists(chemin_resolu):
         return False, f"Dossier introuvable : {chemin_resolu}"
     state.dossier_courant = chemin_resolu
-    subprocess.Popen(f'explorer "{chemin_resolu}"', shell=True)
+    if os.name == 'nt':
+        subprocess.Popen(f'explorer "{chemin_resolu}"', shell=True)
+    elif sys.platform == 'darwin':
+        subprocess.Popen(['open', chemin_resolu])
+    else:
+        subprocess.Popen(['xdg-open', chemin_resolu])
     return True, chemin_resolu
 
 
@@ -103,13 +117,18 @@ def ouvrir_fichier(chemin):
         cible = chemin
 
     try:
-        if os.path.isabs(cible) and os.path.exists(cible):
-            subprocess.Popen(f'start "" "{cible}"', shell=True)
-        else:
-            if " " not in cible:
-                subprocess.Popen(f'start {cible}', shell=True)
-            else:
+        if os.name == 'nt':
+            if os.path.isabs(cible) and os.path.exists(cible):
                 subprocess.Popen(f'start "" "{cible}"', shell=True)
+            else:
+                if " " not in cible:
+                    subprocess.Popen(f'start {cible}', shell=True)
+                else:
+                    subprocess.Popen(f'start "" "{cible}"', shell=True)
+        elif sys.platform == 'darwin':
+            subprocess.Popen(['open', cible])
+        else:
+            subprocess.Popen(['xdg-open', cible])
         return True, cible
     except Exception:
         return False, f"Fichier ou programme introuvable : {chemin}"

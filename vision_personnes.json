@@ -1,0 +1,20 @@
+{
+  "syndou": {
+    "nom": "syndou",
+    "slug": "syndou",
+    "fichier": "syndou.jpg",
+    "relation": "ami(e)",
+    "notes": "",
+    "date_enregistrement": "28/08/2026 à 14:45",
+    "derniere_vue": "04/09/2026 à 10:20"
+  },
+  "de koné": {
+    "nom": "de koné",
+    "slug": "de_koné",
+    "fichier": "de_koné.jpg",
+    "relation": "ami(e)",
+    "notes": "",
+    "date_enregistrement": "28/08/2026 à 14:51",
+    "derniere_vue": "28/08/2026 à 14:51"
+  }
+}

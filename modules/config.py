@@ -28,6 +28,7 @@ LOCAL_IP = get_local_ip()
 GEMINI_API_KEY        = os.getenv("GEMINI_API_KEY")
 YOUTUBE_API_KEY       = os.getenv("YOUTUBE_API_KEY")
 XAI_API_KEY           = os.getenv("XAI_API_KEY")
+OPENAI_API_KEY        = os.getenv("OPENAI_API_KEY")
 HA_URL                = os.getenv("HA_URL")
 HA_TOKEN              = os.getenv("HA_TOKEN")
 SERPAPI_API_KEY        = os.getenv("SERPAPI_API_KEY")
@@ -37,6 +38,7 @@ RESTCOUNTRIES_API_KEY = os.getenv("RESTCOUNTRIES_API_KEY")
 NEWS_API_KEY          = os.getenv("NEWS_API_KEY")
 DEEPL_API_KEY         = os.getenv("DEEPL_API_KEY")
 HUGGINGFACE_API_KEY   = os.getenv("HUGGINGFACE_API_KEY")
+AIMUSIC_API_KEY       = os.getenv("AIMUSIC_API_KEY")
 
 # Spotify
 SPOTIPY_CLIENT_ID     = os.getenv("SPOTIPY_CLIENT_ID")
@@ -55,8 +57,12 @@ grok_client = None
 if XAI_API_KEY and XAI_API_KEY != "VOTRE_CLE_ICI":
     grok_client = OpenAI(api_key=XAI_API_KEY, base_url="https://api.x.ai/v1")
 
+openai_client = None
+if OPENAI_API_KEY and OPENAI_API_KEY != "VOTRE_CLE_ICI":
+    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+
 groq_client = None
-if GROQ_API_KEY and GROQ_API_KEY != "VOTRE_CLE_ICI":
+if GROQ_API_KEY:
     groq_client = OpenAI(api_key=GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
 
 # Spotify
@@ -77,8 +83,7 @@ if SPOTIPY_CLIENT_ID and SPOTIPY_CLIENT_ID != "VOTRE_ID_SPOTIFY":
     except Exception as e:
         print(f"[SPOTIFY] Erreur initialisation : {e}")
 
-# ── Modèles IA ───────────────────────────────────────────────────────────────
-MODELS_LIST  = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-pro-latest"]
+MODELS_LIST  = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]
 CHOSEN_MODEL = MODELS_LIST[0]
 
 OLLAMA_URL    = "http://127.0.0.1:11434"

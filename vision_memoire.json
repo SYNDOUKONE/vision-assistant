@@ -14,6 +14,31 @@
       "valeur": "rouge",
       "timestamp": "23/07/2026 11:03",
       "categorie": "preferences"
+    },
+    "visage_enregistre": {
+      "valeur": "visage de Syndou enregistré pour reconnaissance",
+      "timestamp": "28/08/2026 14:08",
+      "categorie": "general"
+    },
+    "voisine": {
+      "valeur": "Syndou a une voisine",
+      "timestamp": "08/09/2026 11:16",
+      "categorie": "general"
+    },
+    "sensualite_voisine": {
+      "valeur": "ma voisine est sensuelle",
+      "timestamp": "08/09/2026 11:16",
+      "categorie": "preferences"
+    },
+    "gout_mangue": {
+      "valeur": "n'aime pas trop la mangue nature, mais ça se mange bien en salade",
+      "timestamp": "08/09/2026 11:24",
+      "categorie": "preferences"
+    },
+    "pays_origine": {
+      "valeur": "Côte d'Ivoire",
+      "timestamp": "08/09/2026 11:27",
+      "categorie": "general"
     }
   },
   "sessions": [
@@ -28,6 +53,58 @@
     {
       "timestamp": "21/07/2026 13:59",
       "resume": "Syndou et VISION ont discuté de la révision ou de l'achat d'un ordinateur."
+    },
+    {
+      "timestamp": "28/08/2026 14:24",
+      "resume": "Activation du mode Iron Man et recherche web sur les applications de liste de tâches."
+    },
+    {
+      "timestamp": "04/09/2026 10:30",
+      "resume": "Discussion sur les capacités de VISION, programmation d'un projet et questions variées."
+    },
+    {
+      "timestamp": "04/09/2026 10:45",
+      "resume": "Lancement de musiques d'animés et demande d'informations sur la marque automobile Ford."
+    },
+    {
+      "timestamp": "04/09/2026 10:50",
+      "resume": "Discussion sur le rangement de la chambre et le lancement de musique."
+    },
+    {
+      "timestamp": "04/09/2026 11:03",
+      "resume": "Rédaction d'une annonce de location immobilière et explication de la bibliothèque MediaPipe."
+    },
+    {
+      "timestamp": "04/09/2026 11:20",
+      "resume": "Discussion sur la gratuité de Gemini Ortie et ses différentes options payantes."
+    },
+    {
+      "timestamp": "04/09/2026 12:06",
+      "resume": "Tentatives infructueuses de débuter un sujet et échange de salutations."
+    },
+    {
+      "timestamp": "04/09/2026 12:31",
+      "resume": "Demande et obtention des paroles de la musique \"Voices of the Chord\" de 86."
+    },
+    {
+      "timestamp": "04/09/2026 12:56",
+      "resume": "Échange de salutations amicales et Vision propose son aide à Syndou."
+    },
+    {
+      "timestamp": "04/09/2026 13:05",
+      "resume": "Syndou a formulé des requêtes vagues, et VISION a demandé des clarifications."
+    },
+    {
+      "timestamp": "04/09/2026 16:35",
+      "resume": "Information sur Lyon 2, recherche de citation et problèmes de lecture musicale."
+    },
+    {
+      "timestamp": "07/09/2026 11:04",
+      "resume": "Syndou demande à VISION de l'aider à rédiger des messages d'amour et à séduire sa voisine."
+    },
+    {
+      "timestamp": "08/09/2026 14:22",
+      "resume": "Syndou a demandé à VISION d'appeler Maman Ora sur WhatsApp."
     }
   ]
 }

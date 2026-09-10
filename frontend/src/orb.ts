@@ -51,10 +51,10 @@ export function createOrb(canvas: HTMLCanvasElement, palette: OrbPalette = PALET
   let destroyed = false;
   const N = 2500;
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x050508, 1);
+  renderer.setClearColor(0x000000, 0);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(

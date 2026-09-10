@@ -11,35 +11,39 @@ Assistant IA personnel modulaire (voix, domotique, vision, interface web 3D).
 
 ## Installation
 
-```bat
-install.bat
+**Sous macOS / Linux :**
+```bash
+python3 -m venv venv
+./venv/bin/pip install -r requirements.txt
+cd frontend && npm install
 ```
 
-Ou manuellement :
-
-```bash
-python -m venv venv
-venv\Scripts\pip install -r requirements.txt
-cd frontend && npm install
+**Sous Windows :**
+```bat
+install.bat
 ```
 
 Copiez `.env.example` vers `.env` et renseignez vos clés API.
 
 ## Lancement
 
-```bat
-DEMARRER_VISION.bat
+**Sous macOS / Linux :**
+```bash
+./demarrer_vision.sh
+# Ou manuellement :
+./venv/bin/python main_v2.py
 ```
 
-Ou :
-
-```bash
+**Sous Windows :**
+```bat
+DEMARRER_VISION.bat
+# Ou manuellement :
 venv\Scripts\python.exe main_v2.py
 ```
 
 - Interface web : http://localhost:5173
 - WebSocket : `ws://localhost:8765`
-- Mobile : http://&lt;IP_LAN&gt;:8080
+- Mobile : http://<IP_LAN>:8080
 
 ## Structure
 

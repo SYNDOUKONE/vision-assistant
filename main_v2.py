@@ -492,10 +492,16 @@ def main():
     finally:
         if frontend_process:
             print("[VISION] Arret du serveur Web...")
-            subprocess.run(
-                ["taskkill", "/F", "/T", "/PID", str(frontend_process.pid)],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
+            try:
+                if os.name == 'nt':
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(frontend_process.pid)],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    )
+                else:
+                    frontend_process.terminate()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

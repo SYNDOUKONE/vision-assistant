@@ -49,6 +49,36 @@
       <div id="response-text" class="response-vision"></div>
     </div>
 
+    <!-- ══ EMBEDDED MUSIC PLAYER HUD ════════════════════════════════════════ -->
+    <div id="music-player-hud" class="music-player-hidden">
+      <div class="music-player-header">
+        <div class="music-player-badge">
+          <span class="music-eq-bar b1"></span>
+          <span class="music-eq-bar b2"></span>
+          <span class="music-eq-bar b3"></span>
+          <span class="music-eq-bar b4"></span>
+          <span class="music-player-status">AUDIO EN COURS</span>
+        </div>
+        <div class="music-player-controls">
+          <button id="music-collapse-btn" type="button" title="Réduire / Agrandir" aria-label="Réduire">_</button>
+          <button id="music-close-btn" type="button" title="Fermer la musique" aria-label="Fermer">✕</button>
+        </div>
+      </div>
+      <div class="music-player-track">
+        <span class="music-icon">🎵</span>
+        <div id="music-track-title" class="music-track-title">Titre du morceau</div>
+      </div>
+      <div class="music-player-body" id="music-player-body">
+        <iframe
+          id="music-iframe"
+          src=""
+          title="VISION Music Player"
+          allow="autoplay; encrypted-media; picture-in-picture"
+          allowfullscreen
+        ></iframe>
+      </div>
+    </div>
+
     <!-- Error / info toast -->
     <div id="error-text"></div>
 

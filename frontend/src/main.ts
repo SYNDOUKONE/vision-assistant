@@ -10,7 +10,10 @@
 import { createOrb, type OrbState, type OrbPalette, PALETTE_VISION, PALETTE_ADJOUA } from "./orb";
 import { injectVisionButton, captureFrame } from "./screen_capture";
 import { injectWebcamButton, captureWebcamFrame } from "./webcam";
+import { injectGestureButton } from "./gesture_control";
 import { showCarte, hideCarte } from "./carte3d";
+import { initWallpaperSystem } from "./wallpaper";
+import { vision3D } from "./vision3d_interactions";
 import "./style.css";
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -34,6 +37,13 @@ const responsePanelEl = document.getElementById("response-panel") as HTMLDivElem
 const responseUserEl = document.getElementById("response-user") as HTMLDivElement;
 const responseTextEl = document.getElementById("response-text") as HTMLDivElement;
 
+// ── Music player DOM refs ───────────────────────────────────────────────────
+const musicPlayerHudEl = document.getElementById("music-player-hud") as HTMLDivElement;
+const musicIframeEl = document.getElementById("music-iframe") as HTMLIFrameElement;
+const musicTrackTitleEl = document.getElementById("music-track-title") as HTMLDivElement;
+const musicCollapseBtnEl = document.getElementById("music-collapse-btn") as HTMLButtonElement;
+const musicCloseBtnEl = document.getElementById("music-close-btn") as HTMLButtonElement;
+
 // ── Orb — created after profile selection ───────────────────────────────
 let orb: ReturnType<typeof createOrb> | null = null;
 
@@ -49,8 +59,7 @@ const STATE_LABELS: Record<OrbState, string> = {
 };
 
 function applyState(state: OrbState): void {
-  if (!orb) return;
-  orb.setState(state);
+  if (orb) orb.setState(state);
   statusEl.textContent = STATE_LABELS[state];
 }
 
@@ -106,6 +115,93 @@ function showResponse(userText: string, visionText: string): void {
     responsePanelEl.classList.remove("response-hidden");
     responsePanelEl.classList.add("response-visible");
   }
+}
+
+// ── Embedded Music Player Logic ──────────────────────────────────────────────
+function playEmbeddedMusic(videoId: string, title?: string): void {
+  if (!musicPlayerHudEl) return;
+  if (title && musicTrackTitleEl) {
+    musicTrackTitleEl.textContent = title;
+  }
+
+  const body = document.getElementById("music-player-body");
+  if (body) {
+    body.innerHTML = "";
+
+    const iframe = document.createElement("iframe");
+    iframe.id = "music-iframe";
+    iframe.title = "VISION Music Player";
+    iframe.allow = "autoplay; encrypted-media; picture-in-picture";
+    iframe.allowFullscreen = true;
+    iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+    iframe.style.cssText = "width: 100%; height: 100%; border: none; display: block;";
+
+    // Bouton secours si YouTube restreint l'intégration dans l'iframe
+    const fallbackLink = document.createElement("a");
+    fallbackLink.href = `https://www.youtube.com/watch?v=${videoId}`;
+    fallbackLink.target = "_blank";
+    fallbackLink.rel = "noopener noreferrer";
+    fallbackLink.textContent = "↗ Ouvrir sur YouTube";
+    fallbackLink.style.cssText = `
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background: rgba(0,0,0,0.75);
+      color: #ff4444;
+      font-size: 10px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      text-decoration: none;
+      border: 1px solid rgba(255,68,68,0.4);
+      z-index: 10;
+    `;
+
+    body.appendChild(iframe);
+    body.appendChild(fallbackLink);
+  }
+
+  musicPlayerHudEl.classList.remove("music-player-hidden");
+  musicPlayerHudEl.classList.remove("music-player-minimized");
+}
+
+function playEmbeddedAudio(url: string, title?: string): void {
+  if (!musicPlayerHudEl) return;
+  if (title && musicTrackTitleEl) {
+    musicTrackTitleEl.textContent = title;
+  }
+
+  const body = document.getElementById("music-player-body");
+  if (body) {
+    body.innerHTML = "";
+    const audio = document.createElement("audio");
+    audio.src = url;
+    audio.autoplay = true;
+    audio.controls = true;
+    audio.style.cssText = "width: 90%; margin: 30px auto; display: block; outline: none;";
+    body.appendChild(audio);
+  }
+
+  musicPlayerHudEl.classList.remove("music-player-hidden");
+  musicPlayerHudEl.classList.remove("music-player-minimized");
+}
+
+function stopEmbeddedMusic(): void {
+  if (!musicPlayerHudEl) return;
+  const body = document.getElementById("music-player-body");
+  if (body) body.innerHTML = "";
+  musicPlayerHudEl.classList.add("music-player-hidden");
+}
+
+if (musicCloseBtnEl) {
+  musicCloseBtnEl.addEventListener("click", stopEmbeddedMusic);
+}
+
+if (musicCollapseBtnEl) {
+  musicCollapseBtnEl.addEventListener("click", () => {
+    if (musicPlayerHudEl) {
+      musicPlayerHudEl.classList.toggle("music-player-minimized");
+    }
+  });
 }
 
 // ── Connection badge ──────────────────────────────────────────────────────────
@@ -187,6 +283,26 @@ function connect(): void {
         hideCarte();
         return;
       }
+      if (data.action === "play_youtube") {
+        const vid = (data as any).videoId;
+        const title = (data as any).title;
+        if (vid) {
+          playEmbeddedMusic(vid, title);
+        }
+        return;
+      }
+      if (data.action === "stop_youtube") {
+        stopEmbeddedMusic();
+        return;
+      }
+      if (data.action === "play_audio") {
+        const url = (data as any).url;
+        const title = (data as any).title;
+        if (url) {
+          playEmbeddedAudio(url, title);
+        }
+        return;
+      }
       if (data.action === "demo") {
         if (orb) orb.triggerDemo();
         return;
@@ -200,6 +316,26 @@ function connect(): void {
           (data as any).user || "",
           (data as any).text || ""
         );
+        return;
+      }
+      if (data.action === "show_orbe_magnetique") {
+        vision3D.showModule("orbe_magnetique");
+        return;
+      }
+      if (data.action === "show_globe3d") {
+        vision3D.showModule("globe3d");
+        return;
+      }
+      if (data.action === "show_hud_menu") {
+        vision3D.showModule("hud_menu");
+        return;
+      }
+      if (data.action === "show_data_cube") {
+        vision3D.showModule("data_cube");
+        return;
+      }
+      if (data.action === "hide_vision3d") {
+        vision3D.hideCurrentModule();
         return;
       }
       if (data.action === "history_ui") {
@@ -315,6 +451,17 @@ applyState("idle");
 setMuted(false);
 injectVisionButton();
 injectWebcamButton();
+injectGestureButton((data) => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(data));
+  }
+});
+initWallpaperSystem();
+vision3D.init((data: any) => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(data));
+  }
+});
 
 // Listen for profile selection (from the profile screen HTML/JS)
 window.addEventListener("profileSelected", (e: Event) => {

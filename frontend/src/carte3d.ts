@@ -1,29 +1,67 @@
 /**
- * VISION — Carte 3D Holographique
- * Globe de points lumineux bleus avec pin de position en temps réel.
- * Activé par la commande "active la carte".
+ * VISION — Localisation Maps & Vrai Globe Terrestre 3D avec Contrôle Gestuel MediaPipe
+ * 
+ * - Vrai Globe Terrestre 3D photoréaliste (textures continents, océans, nuages animés, atmosphère).
+ * - Contrôle gestuel par caméra via MediaPipe Hands (rotation, pinch zoom, blocage poing, recentrage V, bascule pouce).
+ * - Mini-fenêtre centrale avec bascule Google Maps / Globe 3D.
  */
 
 import * as THREE from "three";
+import { Hands, type Results, HAND_CONNECTIONS } from "@mediapipe/hands";
+import { Camera } from "@mediapipe/camera_utils";
 
+// ── Three.js & Globe Variables ────────────────────────────────────────────────
 let renderer: THREE.WebGLRenderer | null = null;
 let scene: THREE.Scene | null = null;
 let camera: THREE.PerspectiveCamera | null = null;
-let globe: THREE.Points | null = null;
+let earthGroup: THREE.Group | null = null;
+let earthMesh: THREE.Mesh | null = null;
+let cloudsMesh: THREE.Mesh | null = null;
+let atmosphereMesh: THREE.Mesh | null = null;
 let pinGroup: THREE.Group | null = null;
 let animFrameId: number | null = null;
-let container: HTMLDivElement | null = null;
 let isVisible = false;
+let currentView: "maps" | "globe" = "maps";
 
-// ── Géolocalisation ─────────────────────────────────────────────────────────
-let userLat = 48.8566; // Paris par défaut (France)
+// ── Coordonnées & Géolocalisation ─────────────────────────────────────────────
+let userLat = 48.8566; // Paris par défaut
 let userLon = 2.3522;
+let userAddress = "Localisation en cours...";
 
-function latLonToXYZ(
-  lat: number,
-  lon: number,
-  radius: number
-): THREE.Vector3 {
+// ── Inertie & Contrôles Rotation / Zoom ────────────────────────────────────────
+let targetRotationX = 0;
+let targetRotationY = 0;
+let currentRotationX = 0;
+let currentRotationY = 0;
+let targetCameraDist = 4.2;
+let currentCameraDist = 4.2;
+let isLocked = false;
+let isInteracting = false;
+
+// ── MediaPipe Hands & Caméra ─────────────────────────────────────────────────
+let handsDetector: Hands | null = null;
+let cameraUtils: Camera | null = null;
+let videoEl: HTMLVideoElement | null = null;
+let handCanvasEl: HTMLCanvasElement | null = null;
+let handCanvasCtx: CanvasRenderingContext2D | null = null;
+let isGestureControlActive = false;
+let currentGestureName = "En attente d'une main...";
+let lastPinchDist: number | null = null;
+let prevHandPos: { x: number; y: number } | null = null;
+let gestureBadgeEl: HTMLDivElement | null = null;
+
+// ── DOM Elements ─────────────────────────────────────────────────────────────
+let modalOverlay: HTMLDivElement | null = null;
+let mapIframe: HTMLIFrameElement | null = null;
+let globeCanvasContainer: HTMLDivElement | null = null;
+let coordsSpan: HTMLSpanElement | null = null;
+let addressSpan: HTMLSpanElement | null = null;
+let externalLink: HTMLAnchorElement | null = null;
+let btnMaps: HTMLButtonElement | null = null;
+let btnGlobe: HTMLButtonElement | null = null;
+let btnToggleCamera: HTMLButtonElement | null = null;
+
+function latLonToXYZ(lat: number, lon: number, radius: number): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
   const theta = (lon + 180) * (Math.PI / 180);
   return new THREE.Vector3(
@@ -33,425 +71,767 @@ function latLonToXYZ(
   );
 }
 
-// ── Création du globe en points ──────────────────────────────────────────────
-function createGlobePoints(): THREE.Points {
+// ══════════════════════════════════════════════════════════════════════════════
+// 🌍 CHARGEMENT DES VRAIES TEXTURES NASA PHOTOGRAPHIQUES
+// ══════════════════════════════════════════════════════════════════════════════
+
+const _texLoader = new THREE.TextureLoader();
+
+/**
+ * Charge une texture depuis /textures/ avec chargement asynchrone.
+ * Les fichiers sont dans frontend/public/textures/ → servis à /textures/
+ */
+function loadNasaTexture(filename: string, anisotropy = 8): THREE.Texture {
+  const tex = _texLoader.load(
+    `/textures/${filename}`,
+    (t) => { t.needsUpdate = true; },
+    undefined,
+    (err) => console.warn(`[VISION Globe] Texture non chargée: ${filename}`, err)
+  );
+  tex.anisotropy = anisotropy;
+  return tex;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 🪐 CRÉATION DU GLOBE TERRESTRE 3D (THREE.JS)
+// ══════════════════════════════════════════════════════════════════════════════
+
+function createRealEarth(): THREE.Group {
+  const group = new THREE.Group();
   const radius = 1.8;
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const N = 6000;
 
-  // Distribution uniforme sur la sphère (méthode de Fibonacci)
-  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < N; i++) {
-    const y = 1 - (i / (N - 1)) * 2;
-    const r = Math.sqrt(1 - y * y);
-    const theta = goldenAngle * i;
-    const x = Math.cos(theta) * r;
-    const z = Math.sin(theta) * r;
+  // ── 1. Surface Terre : Texture photographique NASA (photo satellite réelle) ──
+  const earthGeo = new THREE.SphereGeometry(radius, 96, 96);
+  const earthMat = new THREE.MeshPhongMaterial({
+    map:          loadNasaTexture("earth_atmos_2048.jpg"),      // Photo satellite NASA
+    specularMap:  loadNasaTexture("earth_specular_2048.jpg"),   // Reflets océaniques
+    normalMap:    loadNasaTexture("earth_normal_2048.jpg"),      // Relief / bump normal
+    normalScale:  new THREE.Vector2(0.8, 0.8),
+    specular:     new THREE.Color(0x336699),
+    shininess:    28,
+  });
+  earthMesh = new THREE.Mesh(earthGeo, earthMat);
+  group.add(earthMesh);
 
-    positions.push(x * radius, y * radius, z * radius);
+  // ── 2. Couche de Nuages Photographiques NASA ──────────────────────────────
+  const cloudsGeo = new THREE.SphereGeometry(radius + 0.022, 64, 64);
+  const cloudsMat = new THREE.MeshStandardMaterial({
+    alphaMap:    loadNasaTexture("earth_clouds_1024.png"),       // Masque alpha nuages réels
+    transparent: true,
+    opacity:     1.0,
+    color:       0xffffff,
+    blending:    THREE.NormalBlending,
+    depthWrite:  false,
+  });
+  cloudsMesh = new THREE.Mesh(cloudsGeo, cloudsMat);
+  group.add(cloudsMesh);
 
-    // Dégradé bleu profond → cyan électrique
-    const t = Math.random();
-    colors.push(
-      0.05 + t * 0.15,   // R
-      0.4 + t * 0.4,     // G
-      0.85 + t * 0.15    // B
-    );
-  }
+  // ── 3. Halo d'Atmosphère Bleu Cyan (côté nuit / limbe) ────────────────────
+  const atmoGeo = new THREE.SphereGeometry(radius + 0.14, 64, 64);
+  const atmoMat = new THREE.MeshBasicMaterial({
+    color:       0x1a9fff,
+    transparent: true,
+    opacity:     0.14,
+    side:        THREE.BackSide,
+    blending:    THREE.AdditiveBlending,
+    depthWrite:  false,
+  });
+  atmosphereMesh = new THREE.Mesh(atmoGeo, atmoMat);
+  group.add(atmosphereMesh);
 
-  // Grille de latitude/longitude (lignes)
-  for (let lat = -80; lat <= 80; lat += 20) {
-    for (let lon = -180; lon <= 180; lon += 3) {
-      const v = latLonToXYZ(lat, lon, radius);
-      positions.push(v.x, v.y, v.z);
-      const t = (lat + 90) / 180;
-      colors.push(0.1, 0.45 + t * 0.2, 0.9);
-    }
-  }
-  for (let lon = -180; lon <= 180; lon += 30) {
-    for (let lat = -85; lat <= 85; lat += 2) {
-      const v = latLonToXYZ(lat, lon, radius);
-      positions.push(v.x, v.y, v.z);
-      const t = (lon + 180) / 360;
-      colors.push(0.05, 0.35 + t * 0.25, 0.85);
-    }
+  // ── 4. Halo interne doux (glow de bord) ───────────────────────────────────
+  const glowGeo = new THREE.SphereGeometry(radius + 0.06, 64, 64);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color:       0x0099ff,
+    transparent: true,
+    opacity:     0.06,
+    side:        THREE.FrontSide,
+    blending:    THREE.AdditiveBlending,
+    depthWrite:  false,
+  });
+  group.add(new THREE.Mesh(glowGeo, glowMat));
+
+  // ── 5. Balise GPS 3D Laser ────────────────────────────────────────────────
+  pinGroup = createRealPin(userLat, userLon, radius);
+  group.add(pinGroup);
+
+  return group;
+}
+
+function createRealPin(lat: number, lon: number, radius: number): THREE.Group {
+  const group = new THREE.Group();
+  const pos = latLonToXYZ(lat, lon, radius);
+
+  // Point d'ancrage doré
+  const dot = new THREE.Mesh(
+    new THREE.SphereGeometry(0.045, 16, 16),
+    new THREE.MeshStandardMaterial({
+      color: 0x00f3ff,
+      emissive: 0x00bfff,
+      emissiveIntensity: 1.2,
+      roughness: 0.2,
+    })
+  );
+  dot.position.copy(pos);
+  group.add(dot);
+
+  // Faisceau lumineux vertical (laser beacon)
+  const normal = pos.clone().normalize();
+  const beamHeight = 0.5;
+  const beamGeo = new THREE.CylinderGeometry(0.008, 0.02, beamHeight, 16);
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0x00eeff,
+    transparent: true,
+    opacity: 0.85,
+    blending: THREE.AdditiveBlending,
+  });
+  const beam = new THREE.Mesh(beamGeo, beamMat);
+  beam.position.copy(pos.clone().addScaledVector(normal, beamHeight / 2));
+  beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+  group.add(beam);
+
+  // Anneaux de pulsation radar
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.08, 0.12, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0x00ddff,
+      transparent: true,
+      opacity: 0.9,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  ring.position.copy(pos);
+  ring.lookAt(new THREE.Vector3(0, 0, 0));
+  ring.userData = { type: "pulse_ring" };
+  group.add(ring);
+
+  return group;
+}
+
+function createStarField(): THREE.Points {
+  const count = 800;
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+
+  for (let i = 0; i < count; i++) {
+    const u = Math.random();
+    const v = Math.random();
+    const theta = u * 2.0 * Math.PI;
+    const phi = Math.acos(2.0 * v - 1.0);
+    const r = Math.cbrt(Math.random()) * 40 + 15;
+
+    const x = r * Math.sin(phi) * Math.cos(theta);
+    const y = r * Math.sin(phi) * Math.sin(theta);
+    const z = r * Math.cos(phi);
+
+    positions[i * 3] = x;
+    positions[i * 3 + 1] = y;
+    positions[i * 3 + 2] = z;
+
+    colors[i * 3] = 0.8 + Math.random() * 0.2;
+    colors[i * 3 + 1] = 0.85 + Math.random() * 0.15;
+    colors[i * 3 + 2] = 1.0;
   }
 
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
   const mat = new THREE.PointsMaterial({
-    size: 0.018,
+    size: 0.25,
     vertexColors: true,
     transparent: true,
-    opacity: 0.9,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
+    opacity: 0.8,
   });
 
   return new THREE.Points(geo, mat);
 }
 
-// ── Épingle de position pulsante ─────────────────────────────────────────────
-function createPin(lat: number, lon: number): THREE.Group {
-  const group = new THREE.Group();
-  const radius = 1.8;
-  const pos = latLonToXYZ(lat, lon, radius);
+// ══════════════════════════════════════════════════════════════════════════════
+// 🖐️ MODULE MEDIAPIPE HANDS (DÉTECTION DE GESTES PAR CAMÉRA)
+// ══════════════════════════════════════════════════════════════════════════════
 
-  // Point central (épingle)
-  const dotGeo = new THREE.SphereGeometry(0.035, 16, 16);
-  const dotMat = new THREE.MeshBasicMaterial({
-    color: 0x00eeff,
-    transparent: true,
-    opacity: 1.0,
+function initMediaPipe(): void {
+  if (handsDetector) return;
+
+  videoEl = document.getElementById("mediapipe-video") as HTMLVideoElement;
+  handCanvasEl = document.getElementById("mediapipe-canvas") as HTMLCanvasElement;
+  if (!videoEl || !handCanvasEl) return;
+  handCanvasCtx = handCanvasEl.getContext("2d");
+
+  handsDetector = new Hands({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
   });
-  const dot = new THREE.Mesh(dotGeo, dotMat);
-  dot.position.copy(pos);
-  group.add(dot);
 
-  // Halo 1 (anneau pulsant)
-  const ring1 = new THREE.Mesh(
-    new THREE.RingGeometry(0.06, 0.075, 32),
-    new THREE.MeshBasicMaterial({
-      color: 0x00ddff,
-      transparent: true,
-      opacity: 0.8,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  );
-  ring1.position.copy(pos);
-  ring1.lookAt(new THREE.Vector3(0, 0, 0));
-  ring1.userData = { type: "ring", phase: 0 };
-  group.add(ring1);
-
-  // Halo 2 (anneau pulsant décalé)
-  const ring2 = new THREE.Mesh(
-    new THREE.RingGeometry(0.1, 0.12, 32),
-    new THREE.MeshBasicMaterial({
-      color: 0x0099cc,
-      transparent: true,
-      opacity: 0.5,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  );
-  ring2.position.copy(pos);
-  ring2.lookAt(new THREE.Vector3(0, 0, 0));
-  ring2.userData = { type: "ring", phase: Math.PI };
-  group.add(ring2);
-
-  // Ligne verticale depuis le centre du globe vers le pin
-  const linePts = [new THREE.Vector3(0, 0, 0), pos];
-  const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
-  const lineMat = new THREE.LineBasicMaterial({
-    color: 0x00aadd,
-    transparent: true,
-    opacity: 0.3,
-    blending: THREE.AdditiveBlending,
+  handsDetector.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.65,
+    minTrackingConfidence: 0.6,
   });
-  group.add(new THREE.Line(lineGeo, lineMat));
 
-  // Label texte
-  const canvas2d = document.createElement("canvas");
-  canvas2d.width = 256;
-  canvas2d.height = 64;
-  const ctx = canvas2d.getContext("2d")!;
-  ctx.fillStyle = "transparent";
-  ctx.clearRect(0, 0, 256, 64);
-  ctx.font = "bold 22px 'Segoe UI', sans-serif";
-  ctx.fillStyle = "#00eeff";
-  ctx.shadowColor = "#00aaff";
-  ctx.shadowBlur = 10;
-  ctx.fillText("📍 Syndou", 10, 40);
+  handsDetector.onResults(handleHandResults);
 
-  const texture = new THREE.CanvasTexture(canvas2d);
-  const labelPlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.6, 0.15),
-    new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    })
-  );
-  const labelOffset = pos.clone().normalize().multiplyScalar(2.15);
-  labelPlane.position.copy(labelOffset);
-  labelPlane.lookAt(new THREE.Vector3(0, 0, 0).addScaledVector(pos, -1));
-  group.add(labelPlane);
-
-  return group;
+  cameraUtils = new Camera(videoEl, {
+    onFrame: async () => {
+      if (isGestureControlActive && videoEl && handsDetector) {
+        await handsDetector.send({ image: videoEl });
+      }
+    },
+    width: 320,
+    height: 240,
+  });
 }
 
-// ── Atmosphère lumineuse ─────────────────────────────────────────────────────
-function createAtmosphere(): THREE.Mesh {
-  const geo = new THREE.SphereGeometry(2.05, 64, 64);
-  const mat = new THREE.MeshBasicMaterial({
-    color: 0x0044aa,
-    transparent: true,
-    opacity: 0.06,
-    side: THREE.BackSide,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-  return new THREE.Mesh(geo, mat);
+function handleHandResults(results: Results): void {
+  if (!handCanvasCtx || !handCanvasEl || !isGestureControlActive) return;
+
+  handCanvasCtx.save();
+  handCanvasCtx.clearRect(0, 0, handCanvasEl.width, handCanvasEl.height);
+
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    const landmarks = results.multiHandLandmarks[0];
+
+    // 1. Dessin du squelette de la main dans le mini HUD caméra
+    handCanvasCtx.strokeStyle = "#00f3ff";
+    handCanvasCtx.lineWidth = 2;
+    for (const [startIdx, endIdx] of HAND_CONNECTIONS) {
+      const p1 = landmarks[startIdx];
+      const p2 = landmarks[endIdx];
+      handCanvasCtx.beginPath();
+      handCanvasCtx.moveTo(p1.x * handCanvasEl.width, p1.y * handCanvasEl.height);
+      handCanvasCtx.lineTo(p2.x * handCanvasEl.width, p2.y * handCanvasEl.height);
+      handCanvasCtx.stroke();
+    }
+
+    for (const p of landmarks) {
+      handCanvasCtx.fillStyle = "#ffffff";
+      handCanvasCtx.beginPath();
+      handCanvasCtx.arc(p.x * handCanvasEl.width, p.y * handCanvasEl.height, 3, 0, Math.PI * 2);
+      handCanvasCtx.fill();
+    }
+
+    // 2. Reconnaissance des Gestes
+    processGesture(landmarks);
+  } else {
+    currentGestureName = "Main non détectée";
+    updateGestureBadge("👁️ Présentez votre main devant la caméra");
+    prevHandPos = null;
+    lastPinchDist = null;
+  }
+
+  handCanvasCtx.restore();
 }
 
-// ── Init Three.js ────────────────────────────────────────────────────────────
+function processGesture(lm: Array<{ x: number; y: number; z: number }>): void {
+  const thumbTip = lm[4];
+  const indexTip = lm[8];
+  const middleTip = lm[12];
+  const ringTip = lm[16];
+  const pinkyTip = lm[20];
+
+  const indexMcp = lm[5];
+  const middleMcp = lm[9];
+  const ringMcp = lm[13];
+  const pinkyMcp = lm[17];
+  const wrist = lm[0];
+
+  // Calcul de l'extension des doigts
+  const isIndexOpen = indexTip.y < indexMcp.y;
+  const isMiddleOpen = middleTip.y < middleMcp.y;
+  const isRingOpen = ringTip.y < ringMcp.y;
+  const isPinkyOpen = pinkyTip.y < pinkyMcp.y;
+  const isThumbUp = thumbTip.y < indexMcp.y && thumbTip.y < wrist.y;
+
+  // Distance Index-Pouce (Pinch)
+  const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+
+  // Centre de la paume
+  const palmCenter = {
+    x: (wrist.x + middleMcp.x) / 2,
+    y: (wrist.y + middleMcp.y) / 2,
+  };
+
+  // ── GESTE 1 : ✊ POING FERMÉ (Stop / Verrouillage du globe) ───────────────
+  if (!isIndexOpen && !isMiddleOpen && !isRingOpen && !isPinkyOpen) {
+    isLocked = true;
+    currentGestureName = "✊ Globe Verrouillé";
+    updateGestureBadge("✊ Poing Fermé : Rotation Bloquée");
+    prevHandPos = null;
+    return;
+  }
+  isLocked = false;
+
+  // ── GESTE 2 : ✌️ SIGNE V / VICTOIRE (Recentrage sur Syndou) ─────────────
+  if (isIndexOpen && isMiddleOpen && !isRingOpen && !isPinkyOpen) {
+    currentGestureName = "✌️ Recentrage GPS";
+    updateGestureBadge("✌️ Signe V : Recentrage sur votre position");
+    recenterOnLocation();
+    prevHandPos = null;
+    return;
+  }
+
+  // ── GESTE 3 : 👍 POUCE LEVÉ (Bascule Vue Maps / 3D) ──────────────────────
+  if (isThumbUp && !isIndexOpen && !isMiddleOpen && !isRingOpen && !isPinkyOpen) {
+    currentGestureName = "👍 Bascule de Vue";
+    updateGestureBadge("👍 Pouce Levé : Changement de vue");
+    switchView(currentView === "maps" ? "globe" : "maps");
+    return;
+  }
+
+  // ── GESTE 4 : 👌 PINCEMENT (Pinch Zoom) ──────────────────────────────────
+  if (pinchDist < 0.08 && isMiddleOpen && isRingOpen) {
+    if (lastPinchDist !== null) {
+      const delta = pinchDist - lastPinchDist;
+      targetCameraDist = THREE.MathUtils.clamp(targetCameraDist - delta * 12, 2.5, 7.0);
+      const zoomLevel = (5.0 / targetCameraDist).toFixed(1);
+      currentGestureName = `👌 Zoom ${zoomLevel}x`;
+      updateGestureBadge(`👌 Pincement : Zoom ${zoomLevel}x`);
+    }
+    lastPinchDist = pinchDist;
+    prevHandPos = null;
+    return;
+  }
+  lastPinchDist = null;
+
+  // ── GESTE 5 : ✋ MAIN OUVERTE / TRANSLATION (Rotation 3D intuitive) ──────
+  if (isIndexOpen && isMiddleOpen && isRingOpen && isPinkyOpen) {
+    if (prevHandPos) {
+      const dx = palmCenter.x - prevHandPos.x;
+      const dy = palmCenter.y - prevHandPos.y;
+
+      targetRotationY -= dx * 4.5;
+      targetRotationX += dy * 3.5;
+      targetRotationX = THREE.MathUtils.clamp(targetRotationX, -Math.PI / 2.3, Math.PI / 2.3);
+
+      currentGestureName = "✋ Rotation 3D";
+      updateGestureBadge("✋ Paume Ouverte : Rotation Libre");
+    }
+    prevHandPos = palmCenter;
+    return;
+  }
+
+  prevHandPos = null;
+  updateGestureBadge("🖐️ Main détectée — Prête aux gestes");
+}
+
+function updateGestureBadge(text: string): void {
+  if (gestureBadgeEl) {
+    gestureBadgeEl.textContent = text;
+  }
+}
+
+function recenterOnLocation(): void {
+  const phi = (90 - userLat) * (Math.PI / 180);
+  const theta = (userLon + 180) * (Math.PI / 180);
+
+  targetRotationX = (phi - Math.PI / 2);
+  targetRotationY = -theta + Math.PI / 2;
+  targetCameraDist = 3.6;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 🖥️ INTERFACE MODALE & AFFICHAGE
+// ══════════════════════════════════════════════════════════════════════════════
+
+function initModal(): void {
+  if (modalOverlay) return;
+
+  modalOverlay = document.createElement("div");
+  modalOverlay.id = "carte-modal";
+  modalOverlay.className = "carte-modal-hidden";
+
+  modalOverlay.innerHTML = `
+    <div class="carte-window" id="carte-window">
+      <!-- HEADER -->
+      <div class="carte-header">
+        <div class="carte-title-wrap">
+          <span class="carte-pulse-dot"></span>
+          <span class="carte-title">VISION — GLOBE 3D &amp; MAPS</span>
+          <span class="carte-badge">GPS CONNECTÉ</span>
+        </div>
+        <div class="carte-header-actions">
+          <div class="carte-view-toggle">
+            <button id="btn-view-maps" type="button">🗺️ Maps</button>
+            <button id="btn-view-globe" class="active" type="button">🌍 Vrai Globe 3D</button>
+          </div>
+          <button id="btn-toggle-camera" class="carte-cam-btn" type="button" title="Activer le contrôle gestuel par caméra">
+            📹 Contrôle Gestuel
+          </button>
+          <button id="btn-carte-close" class="carte-close-btn" type="button" title="Fermer (Échap)">✕</button>
+        </div>
+      </div>
+
+      <!-- BODY (MAPS / 3D REAL EARTH / MEDIAPIPE HUD) -->
+      <div class="carte-body">
+        <div id="map-frame-container" class="map-view-hidden">
+          <iframe
+            id="carte-iframe"
+            title="Google Maps"
+            src="https://maps.google.com/maps?q=${userLat},${userLon}&hl=fr&z=15&output=embed"
+            allowfullscreen
+            loading="lazy"
+          ></iframe>
+        </div>
+
+        <div id="globe-3d-container" class="globe-view-active"></div>
+
+        <!-- HUD FLOTTANT CONTRÔLE GESTUEL MEDIAPIPE -->
+        <div id="mediapipe-hud" class="mediapipe-hud-hidden">
+          <div class="mediapipe-hud-header">
+            <span>📹 DÉTECTION DES MAINS</span>
+            <span id="mediapipe-gesture-badge">✋ Prêt</span>
+          </div>
+          <div class="mediapipe-hud-view">
+            <video id="mediapipe-video" playsinline muted autoplay></video>
+            <canvas id="mediapipe-canvas" width="320" height="240"></canvas>
+          </div>
+          <div class="mediapipe-legend">
+            <span>✋ Tourner</span>
+            <span>👌 Zoom</span>
+            <span>✊ Bloquer</span>
+            <span>✌️ Recentrer</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- FOOTER -->
+      <div class="carte-footer">
+        <div class="carte-info-group">
+          <div class="carte-address" id="carte-address">📍 ${userAddress}</div>
+          <div class="carte-coords" id="carte-coords">LAT: ${userLat.toFixed(4)}° · LON: ${userLon.toFixed(4)}°</div>
+        </div>
+        <div class="carte-footer-actions">
+          <button id="btn-recenter-gps" class="carte-btn-secondary" type="button" title="Actualiser et recentrer sur ma position">🎯 Ma position</button>
+          <a id="carte-external-link" class="carte-btn-primary" href="https://www.google.com/maps?q=${userLat},${userLon}" target="_blank" rel="noopener">Ouvrir Maps ↗</a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modalOverlay);
+
+  // References
+  mapIframe = document.getElementById("carte-iframe") as HTMLIFrameElement;
+  globeCanvasContainer = document.getElementById("globe-3d-container") as HTMLDivElement;
+  coordsSpan = document.getElementById("carte-coords") as HTMLSpanElement;
+  addressSpan = document.getElementById("carte-address") as HTMLDivElement;
+  externalLink = document.getElementById("carte-external-link") as HTMLAnchorElement;
+  btnMaps = document.getElementById("btn-view-maps") as HTMLButtonElement;
+  btnGlobe = document.getElementById("btn-view-globe") as HTMLButtonElement;
+  btnToggleCamera = document.getElementById("btn-toggle-camera") as HTMLButtonElement;
+  gestureBadgeEl = document.getElementById("mediapipe-gesture-badge") as HTMLDivElement;
+
+  // Listeners
+  document.getElementById("btn-carte-close")?.addEventListener("click", hideCarte);
+
+  modalOverlay.addEventListener("click", (e) => {
+    if (e.target === modalOverlay) hideCarte();
+  });
+
+  btnMaps?.addEventListener("click", () => switchView("maps"));
+  btnGlobe?.addEventListener("click", () => switchView("globe"));
+
+  btnToggleCamera?.addEventListener("click", toggleGestureControl);
+
+  document.getElementById("btn-recenter-gps")?.addEventListener("click", () => {
+    fetchGeolocation(true);
+    recenterOnLocation();
+  });
+
+  // Init Three.js
+  initThree();
+
+  // Init MediaPipe
+  initMediaPipe();
+}
+
+function toggleGestureControl(): void {
+  isGestureControlActive = !isGestureControlActive;
+  const hud = document.getElementById("mediapipe-hud");
+
+  if (isGestureControlActive) {
+    btnToggleCamera?.classList.add("cam-active");
+    hud?.classList.remove("mediapipe-hud-hidden");
+    cameraUtils?.start();
+  } else {
+    btnToggleCamera?.classList.remove("cam-active");
+    hud?.classList.add("mediapipe-hud-hidden");
+    cameraUtils?.stop();
+    prevHandPos = null;
+    lastPinchDist = null;
+  }
+}
+
+function switchView(view: "maps" | "globe"): void {
+  currentView = view;
+  const mapContainer = document.getElementById("map-frame-container");
+  const globeContainer = document.getElementById("globe-3d-container");
+
+  if (view === "maps") {
+    btnMaps?.classList.add("active");
+    btnGlobe?.classList.remove("active");
+    mapContainer?.classList.remove("map-view-hidden");
+    mapContainer?.classList.add("map-view-active");
+    globeContainer?.classList.remove("globe-view-active");
+    globeContainer?.classList.add("globe-view-hidden");
+  } else {
+    btnGlobe?.classList.add("active");
+    btnMaps?.classList.remove("active");
+    globeContainer?.classList.remove("globe-view-hidden");
+    globeContainer?.classList.add("globe-view-active");
+    mapContainer?.classList.remove("map-view-active");
+    mapContainer?.classList.add("map-view-hidden");
+    onResize();
+  }
+}
+
 function initThree(): void {
-  container = document.createElement("div");
-  container.id = "carte-3d-container";
-  Object.assign(container.style, {
-    position: "fixed",
-    inset: "0",
-    zIndex: "999",
-    background: "rgba(0,0,0,0)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    opacity: "0",
-    transition: "opacity 0.8s ease",
-    pointerEvents: "all",
-  });
-  document.body.appendChild(container);
-
-  // Close button
-  const closeBtn = document.createElement("button");
-  closeBtn.textContent = "✕ fermer";
-  Object.assign(closeBtn.style, {
-    position: "absolute",
-    top: "20px",
-    right: "20px",
-    background: "rgba(0,40,80,0.6)",
-    border: "1px solid rgba(0,200,255,0.3)",
-    borderRadius: "999px",
-    color: "rgba(0,220,255,0.9)",
-    fontSize: "13px",
-    letterSpacing: "2px",
-    padding: "8px 18px",
-    cursor: "pointer",
-    zIndex: "1001",
-    backdropFilter: "blur(12px)",
-    fontFamily: "inherit",
-    textTransform: "uppercase",
-  });
-  closeBtn.addEventListener("click", hideCarte);
-  container.appendChild(closeBtn);
-
-  // Title
-  const title = document.createElement("div");
-  title.textContent = "VISION — Localisation";
-  Object.assign(title.style, {
-    position: "absolute",
-    top: "22px",
-    left: "50%",
-    transform: "translateX(-50%)",
-    color: "rgba(0,200,255,0.6)",
-    fontSize: "12px",
-    letterSpacing: "5px",
-    textTransform: "uppercase",
-    fontFamily: "inherit",
-    fontWeight: "300",
-    pointerEvents: "none",
-  });
-  container.appendChild(title);
-
-  // Coords display
-  const coordsEl = document.createElement("div");
-  coordsEl.id = "vision-coords";
-  Object.assign(coordsEl.style, {
-    position: "absolute",
-    bottom: "30px",
-    left: "50%",
-    transform: "translateX(-50%)",
-    color: "rgba(0,200,255,0.5)",
-    fontSize: "12px",
-    letterSpacing: "3px",
-    fontFamily: "monospace",
-    textAlign: "center",
-    pointerEvents: "none",
-  });
-  coordsEl.textContent = `lat: ${userLat.toFixed(4)}° · lon: ${userLon.toFixed(4)}°`;
-  container.appendChild(coordsEl);
+  if (!globeCanvasContainer) return;
 
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(
-    55,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    100
-  );
-  camera.position.set(0, 0, 4.5);
+  camera = new THREE.PerspectiveCamera(45, (globeCanvasContainer.clientWidth || 760) / (globeCanvasContainer.clientHeight || 420), 0.1, 100);
+  camera.position.set(0, 0, currentCameraDist);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x000000, 0);
-  Object.assign(renderer.domElement.style, {
-    position: "absolute",
-    inset: "0",
-    width: "100%",
-    height: "100%",
-  });
-  container.appendChild(renderer.domElement);
+  renderer.setSize(globeCanvasContainer.clientWidth || 760, globeCanvasContainer.clientHeight || 420);
+  renderer.setClearColor(0x020409, 1);
 
-  // Ambient light (gives depth)
-  const ambientLight = new THREE.AmbientLight(0x003366, 1.5);
+  globeCanvasContainer.appendChild(renderer.domElement);
+
+  // Lumière du Soleil (Directionnelle)
+  const sunLight = new THREE.DirectionalLight(0xffffff, 1.8);
+  sunLight.position.set(5, 3, 5);
+  scene.add(sunLight);
+
+  // Lumière d'ambiance douce (côté nuit)
+  const ambientLight = new THREE.AmbientLight(0x1a2e4a, 0.9);
   scene.add(ambientLight);
 
-  // Globe
-  globe = createGlobePoints();
-  scene.add(globe);
+  // Champ d'étoiles
+  scene.add(createStarField());
 
-  // Atmosphere
-  scene.add(createAtmosphere());
+  // Vrai Globe Terrestre
+  earthGroup = createRealEarth();
+  scene.add(earthGroup);
 
-  // Initial pin at default location (will update after geolocation)
-  pinGroup = createPin(userLat, userLon);
-  scene.add(pinGroup);
+  // Position initiale
+  recenterOnLocation();
 
-  // Resize handler
-  window.addEventListener("resize", onResize);
-
-  // Mouse drag rotation
-  setupDrag();
+  // Contrôles souris
+  setupMouseControls();
 }
 
-// ── Drag rotation ────────────────────────────────────────────────────────────
-let isPointerDown = false;
-let prevPointer = { x: 0, y: 0 };
-let rotVelocity = { x: 0, y: 0 };
+function setupMouseControls(): void {
+  if (!renderer) return;
+  const el = renderer.domElement;
+  let isDown = false;
+  let startX = 0;
+  let startY = 0;
 
-function setupDrag(): void {
-  const el = renderer!.domElement;
   el.addEventListener("pointerdown", (e) => {
-    isPointerDown = true;
-    prevPointer = { x: e.clientX, y: e.clientY };
-    rotVelocity = { x: 0, y: 0 };
+    isDown = true;
+    isInteracting = true;
+    startX = e.clientX;
+    startY = e.clientY;
   });
+
   el.addEventListener("pointermove", (e) => {
-    if (!isPointerDown || !globe) return;
-    const dx = e.clientX - prevPointer.x;
-    const dy = e.clientY - prevPointer.y;
-    rotVelocity.y = dx * 0.008;
-    rotVelocity.x = dy * 0.008;
-    globe.rotation.y += rotVelocity.y;
-    globe.rotation.x += rotVelocity.x;
-    if (pinGroup) {
-      pinGroup.rotation.y += rotVelocity.y;
-      pinGroup.rotation.x += rotVelocity.x;
-    }
-    prevPointer = { x: e.clientX, y: e.clientY };
+    if (!isDown) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    targetRotationY += dx * 0.006;
+    targetRotationX += dy * 0.006;
+    targetRotationX = THREE.MathUtils.clamp(targetRotationX, -Math.PI / 2.2, Math.PI / 2.2);
+    startX = e.clientX;
+    startY = e.clientY;
   });
-  el.addEventListener("pointerup", () => { isPointerDown = false; });
+
+  el.addEventListener("pointerup", () => {
+    isDown = false;
+    isInteracting = false;
+  });
+
+  el.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    targetCameraDist = THREE.MathUtils.clamp(targetCameraDist + e.deltaY * 0.004, 2.4, 7.0);
+  }, { passive: false });
 }
 
-let autoRotY = 0;
-
-// ── Animation loop ───────────────────────────────────────────────────────────
 function animate(): void {
   animFrameId = requestAnimationFrame(animate);
   const t = Date.now() * 0.001;
 
-  // Globe auto-rotation
-  if (!isPointerDown && globe) {
-    globe.rotation.y += 0.0012;
+  if (currentView === "globe" && earthGroup && camera) {
+    // 1. Rotation continue si non bloqué et pas d'interaction
+    if (!isLocked && !isInteracting && !isGestureControlActive) {
+      targetRotationY += 0.0015;
+    }
+
+    // 2. Interpolation fluide de la rotation (Damping)
+    currentRotationX += (targetRotationX - currentRotationX) * 0.1;
+    currentRotationY += (targetRotationY - currentRotationY) * 0.1;
+    earthGroup.rotation.x = currentRotationX;
+    earthGroup.rotation.y = currentRotationY;
+
+    // 3. Rotation atmosphérique des nuages
+    if (cloudsMesh) {
+      cloudsMesh.rotation.y += 0.0006;
+    }
+
+    // 4. Interpolation fluide du zoom caméra
+    currentCameraDist += (targetCameraDist - currentCameraDist) * 0.1;
+    camera.position.z = currentCameraDist;
+
+    // 5. Pulsation de l'anneau radar
     if (pinGroup) {
-      pinGroup.rotation.y += 0.0012;
+      pinGroup.children.forEach((c) => {
+        if (c.userData?.type === "pulse_ring") {
+          const s = 1 + 0.5 * Math.abs(Math.sin(t * 2.5));
+          c.scale.setScalar(s);
+          (c as THREE.Mesh<any, THREE.MeshBasicMaterial>).material.opacity = 1 - (s - 1);
+        }
+      });
+    }
+
+    if (renderer && scene) {
+      renderer.render(scene, camera);
     }
   }
-
-  // Pin rings pulsation
-  if (pinGroup) {
-    pinGroup.children.forEach((child) => {
-      if (child.userData?.type === "ring") {
-        const phase = child.userData.phase as number;
-        const scale = 1 + 0.45 * Math.abs(Math.sin(t * 1.8 + phase));
-        child.scale.setScalar(scale);
-        (child as THREE.Mesh<any, THREE.MeshBasicMaterial>).material.opacity =
-          0.9 * (1 - Math.abs(Math.sin(t * 1.8 + phase)) * 0.6);
-      }
-    });
-  }
-
-  // Camera gentle float
-  camera!.position.y = Math.sin(t * 0.3) * 0.08;
-  camera!.lookAt(0, 0, 0);
-
-  renderer!.render(scene!, camera!);
 }
 
 function onResize(): void {
-  if (!camera || !renderer) return;
-  camera.aspect = window.innerWidth / window.innerHeight;
+  if (!globeCanvasContainer || !camera || !renderer) return;
+  const w = globeCanvasContainer.clientWidth || 760;
+  const h = globeCanvasContainer.clientHeight || 420;
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(w, h);
 }
 
-// ── Positionnement GPS ───────────────────────────────────────────────────────
-function updatePosition(lat: number, lon: number): void {
+// ══════════════════════════════════════════════════════════════════════════════
+// 📍 GÉOLOCALISATION & ADRESSE
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function reverseGeocode(lat: number, lon: number): Promise<void> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
+      { headers: { "Accept-Language": "fr" } }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const addr = data.address || {};
+      const street = addr.road || addr.pedestrian || addr.suburb || "";
+      const city = addr.city || addr.town || addr.village || addr.municipality || "";
+      const postcode = addr.postcode || "";
+      const country = addr.country || "";
+
+      const parts = [street, city, postcode, country].filter(Boolean);
+      userAddress = parts.length > 0 ? parts.join(", ") : data.display_name || "Position repérée";
+      if (addressSpan) {
+        addressSpan.textContent = `📍 ${userAddress}`;
+      }
+    }
+  } catch {
+    if (addressSpan) {
+      addressSpan.textContent = `📍 Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°`;
+    }
+  }
+}
+
+function updateLocation(lat: number, lon: number): void {
   userLat = lat;
   userLon = lon;
-  if (scene && pinGroup) {
-    scene.remove(pinGroup);
-    pinGroup = createPin(lat, lon);
-    scene.add(pinGroup);
+
+  if (mapIframe) {
+    mapIframe.src = `https://maps.google.com/maps?q=${lat},${lon}&hl=fr&z=15&output=embed`;
   }
-  const coordsEl = document.getElementById("vision-coords");
-  if (coordsEl) {
-    coordsEl.textContent = `lat: ${lat.toFixed(4)}° · lon: ${lon.toFixed(4)}°`;
+  if (coordsSpan) {
+    coordsSpan.textContent = `LAT: ${lat.toFixed(4)}° · LON: ${lon.toFixed(4)}°`;
   }
+  if (externalLink) {
+    externalLink.href = `https://www.google.com/maps?q=${lat},${lon}`;
+  }
+
+  if (earthGroup && pinGroup) {
+    earthGroup.remove(pinGroup);
+    pinGroup = createRealPin(lat, lon, 1.8);
+    earthGroup.add(pinGroup);
+  }
+
+  reverseGeocode(lat, lon);
 }
 
-function fetchGeolocation(): void {
-  if (!navigator.geolocation) return;
+function fetchGeolocation(forceRecenter = false): void {
+  if (!navigator.geolocation) {
+    updateLocation(userLat, userLon);
+    return;
+  }
+
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      updatePosition(pos.coords.latitude, pos.coords.longitude);
+      updateLocation(pos.coords.latitude, pos.coords.longitude);
+      if (forceRecenter) recenterOnLocation();
     },
-    () => {
-      console.warn("[CARTE] Géolocalisation refusée, position par défaut.");
+    async () => {
+      try {
+        const r = await fetch("https://ipapi.co/json/");
+        if (r.ok) {
+          const d = await r.json();
+          if (d.latitude && d.longitude) {
+            updateLocation(d.latitude, d.longitude);
+            if (forceRecenter) recenterOnLocation();
+            return;
+          }
+        }
+      } catch {}
+      updateLocation(userLat, userLon);
     },
-    { timeout: 8000, maximumAge: 60000 }
+    { enableHighAccuracy: true, timeout: 7000, maximumAge: forceRecenter ? 0 : 60000 }
   );
 }
 
-// ── Show / Hide ──────────────────────────────────────────────────────────────
+// ── Export Show / Hide ────────────────────────────────────────────────────────
 export function showCarte(): void {
   if (isVisible) return;
-  if (!container) {
-    initThree();
-  }
+  initModal();
   isVisible = true;
-  container!.style.display = "flex";
-  requestAnimationFrame(() => {
-    container!.style.opacity = "1";
-    container!.style.background =
-      "radial-gradient(ellipse at center, rgba(0,10,30,0.92) 0%, rgba(0,0,8,0.97) 100%)";
-  });
+
+  if (modalOverlay) {
+    modalOverlay.classList.remove("carte-modal-hidden");
+    modalOverlay.classList.add("carte-modal-visible");
+  }
+
+  switchView("globe");
   fetchGeolocation();
-  if (!animFrameId) animate();
+
+  if (!animFrameId) {
+    animate();
+  }
 }
 
 export function hideCarte(): void {
-  if (!isVisible || !container) return;
+  if (!isVisible || !modalOverlay) return;
   isVisible = false;
-  container.style.opacity = "0";
-  container.style.background = "rgba(0,0,0,0)";
-  setTimeout(() => {
-    if (container) container.style.display = "none";
-    if (animFrameId !== null) {
-      cancelAnimationFrame(animFrameId);
-      animFrameId = null;
-    }
-  }, 800);
+  modalOverlay.classList.remove("carte-modal-visible");
+  modalOverlay.classList.add("carte-modal-hidden");
+
+  if (isGestureControlActive) {
+    toggleGestureControl();
+  }
+
+  if (animFrameId !== null) {
+    cancelAnimationFrame(animFrameId);
+    animFrameId = null;
+  }
 }
 
 export function toggleCarte(): void {
   isVisible ? hideCarte() : showCarte();
 }
+
+

@@ -10,16 +10,18 @@ import time
 import asyncio
 import pyautogui
 import subprocess
+import shutil
 
 from datetime import datetime
 
 from modules import state
 from modules.config import (
-    grok_client, genai_types,
+    grok_client, genai_types, LOCAL_IP,
     PIECES_LUMIERES, PIECES_PRISES, PIECES_CAPTEURS, PIECES_HUMIDITE,
     APPAREILS_BATTERIE, APPAREILS_ENERGIE, COULEURS_MAP, HA_TARIFS,
     HA_URL, HA_HEADERS,
 )
+from modules.ai_music import generer_musique, rechercher_musique_ai
 from modules.voice import parler, nettoyer_commande
 from modules.home_assistant import (
     ha_appeler_service, ha_get_etat, ha_get_calendrier,
@@ -40,11 +42,15 @@ from modules.weather_sports import (
     get_meteo_actuelle, get_alertes_meteo,
     get_resultats_football, get_classement_football, get_resultats_sport_gemini,
 )
-from modules.music import chercher_youtube, jouer_musique_spotify
+from modules.music import chercher_youtube, chercher_youtube_id, jouer_musique_spotify
 from modules.vision_screen import (
     vision_cliquer, vision_ecrire, vision_selectionner,
     vision_decrire, vision_voir_utilisateur,
     vision_reconnaitre_personne, vision_analyser_objet, navigation_autonome
+)
+from modules.face_recognition_system import (
+    enregistrer_visage, reconnaitre_personne,
+    lister_personnes_connues, supprimer_visage
 )
 from modules.assistant import (
     ajouter_tache, lister_taches, finir_tache, 
@@ -56,7 +62,10 @@ from modules.web_search import (
     recherche_arxiv, info_pays, traduire_deepl, recherche_web_globale
 )
 from modules.memory import charger_memoire, ajouter_memoire, supprimer_memoire
-from modules.websocket_server import send_web_state, request_screen_capture, send_web_text, send_web_carte
+from modules.websocket_server import (
+    send_web_state, request_screen_capture, send_web_text, send_web_carte,
+    send_web_youtube, stop_web_youtube, send_web_audio
+)
 from modules.ai_brain import demander_ia, demander_ia_vision, demander_grok
 from modules.local_solvers import (
     resoudre_math_localement, resoudre_francais_localement,
@@ -148,7 +157,7 @@ async def action_whatsapp_appel(contact):
 
 
 def extraire_blocs_json(texte):
-    """Extrait proprement les blocs JSON du texte en gérant l'équilibrage des accolades."""
+    """Extrait proprement les blocs JSON du texte en gérant l'équilibrage des accolades et nettoie la syntaxe si besoin."""
     blocs = []
     pile = []
     debut = -1
@@ -165,12 +174,27 @@ def extraire_blocs_json(texte):
     
     blocs_valides = []
     for b in blocs:
+        # Tentative 1 : JSON direct
         try:
             json.loads(b)
             blocs_valides.append(b)
+            continue
         except Exception:
             pass
+
+        # Tentative 2 : Nettoyage automatique des guillemets doubles accidentels (ex: ."" -> .")
+        try:
+            b_nettoye = re.sub(r'(?<=\w|[.,!?;])""+', '"', b)
+            b_nettoye = re.sub(r'""+(?=\s*[:,}])', '"', b_nettoye)
+            b_nettoye = re.sub(r',\s*([}\]])', r'\1', b_nettoye)
+            json.loads(b_nettoye)
+            blocs_valides.append(b_nettoye)
+            continue
+        except Exception:
+            pass
+
     return blocs_valides
+
 
 
 async def traiter_commande_entiere(texte_utilisateur, mobile_ws=None):
@@ -202,10 +226,6 @@ async def traiter_commande_entiere(texte_utilisateur, mobile_ws=None):
 
 
     if not reponse:
-        import random
-        phrases_attente = ["Je cherche...", "Un instant Syndou...", "Laissez-moi réfléchir...", "Je regarde ça pour vous...", "Donnez-moi une seconde..."]
-        # Lancer la phrase d'attente dynamiquement (non-bloquant avec asyncio.create_task si nécessaire, ou on l'envoie direct)
-        asyncio.create_task(parler(random.choice(phrases_attente)))
         reponse = await demander_ia(texte_utilisateur)
 
     print(f"[VISION] {reponse}")
@@ -224,8 +244,46 @@ async def traiter_commande_entiere(texte_utilisateur, mobile_ws=None):
             action = data.get("action", "")
             print(f"[VISION] Execution de l'action : {action}")
 
+            # ── FONCTIONNALITÉS JARVIS ENRICHIES ─────────────────────────────
+            if action == "reconnaître_musique":
+                from modules.music import reconnaître_musique_actuelle
+                msg = await reconnaître_musique_actuelle(duree_sec=5)
+                await parler(msg)
+
+            elif action == "eteindre_pc":
+                from modules.power import eteindre_pc_securise
+                msg = eteindre_pc_securise(delai_secondes=30)
+                await parler(msg)
+
+            elif action == "annuler_extinction":
+                from modules.power import annuler_extinction_pc
+                msg = annuler_extinction_pc()
+                await parler(msg)
+
+            elif action == "wake_on_lan":
+                mac = data.get("mac", "")
+                from modules.power import wake_on_lan
+                msg = wake_on_lan(mac)
+                await parler(msg)
+
+            elif action == "activer_gestes":
+                from modules.gestures import activer_reconnaissance_gestes
+                msg = activer_reconnaissance_gestes()
+                await parler(msg)
+
+            elif action == "desactiver_gestes":
+                from modules.gestures import desactiver_reconnaissance_gestes
+                msg = desactiver_reconnaissance_gestes()
+                await parler(msg)
+
+            elif action == "get_budget":
+                from modules.budget import obtenir_resume_budget
+                msg = obtenir_resume_budget()
+                await parler(msg)
+
             # ── MODES ────────────────────────────────────────────────────
-            if action == "mode_iron_man":
+            elif action == "mode_iron_man":
+
                 etat = data.get("etat", "off")
                 state.MODE_IRON_MAN = (etat == "on")
                 msg = "Mode Iron Man activé, Monsieur. Je reste à l'écoute de vos signaux." if state.MODE_IRON_MAN else "Mode Iron Man désactivé. Je repasse en veille domotique."
@@ -621,7 +679,21 @@ async def traiter_commande_entiere(texte_utilisateur, mobile_ws=None):
                 await parler(await vision_voir_utilisateur(data.get("question", "Que vois-tu?")))
             elif action == "reconnaitre_personne":
                 await parler("Un instant Syndou, j'analyse le visage devant la caméra...")
-                res = await vision_reconnaitre_personne()
+                res = await reconnaitre_personne()
+                await parler(res)
+            elif action == "enregistrer_visage":
+                nom = data.get("nom", "").strip()
+                relation = data.get("relation", "")
+                notes = data.get("notes", "")
+                await parler(f"Regardez bien la caméra Syndou, j'enregistre le visage pour {nom}...")
+                res = await enregistrer_visage(nom, relation=relation, notes=notes)
+                await parler(res)
+            elif action == "lister_personnes":
+                res = lister_personnes_connues()
+                await parler(res)
+            elif action == "supprimer_visage":
+                nom = data.get("nom", "").strip()
+                res = supprimer_visage(nom)
                 await parler(res)
             elif action == "analyser_objet":
                 question = data.get("question", "Analyse cet objet")
@@ -636,10 +708,10 @@ async def traiter_commande_entiere(texte_utilisateur, mobile_ws=None):
                 etat = data.get("etat", "on")
                 if etat == "on":
                     await send_web_carte(True)
-                    await parler("Affichage de la carte holographique en cours, Syndou. Initialisation de la position GPS.")
+                    await parler("Voici votre position actuelle sur Google Maps au centre de l'écran, Syndou.")
                 else:
                     await send_web_carte(False)
-                    await parler("Fermeture de la carte de localisation.")
+                    await parler("Fermeture de la carte.")
 
             # ── ASSISTANT PERSONNEL ──────────────────────────────────────
             elif action == "ajouter_tache":
@@ -669,15 +741,15 @@ async def traiter_commande_entiere(texte_utilisateur, mobile_ws=None):
                 res = await raconter_histoire(data.get("theme", "aventure"))
                 await parler(res)
 
-            # ── MUSIQUE ──────────────────────────────────────────────────
+            # ── MUSIQUE & AUDIO (Directement sur l'interface) ────────────
             elif action == "jouer_musique":
                 nom = data.get("nom", "")
-                plateforme = data.get("plateforme", "youtube").lower()
                 if nom:
-                    if plateforme == "spotify":
-                        await parler(await jouer_musique_spotify(nom))
+                    await parler(f"Très bien Syndou, je lance {nom} sur votre interface.")
+                    vid = chercher_youtube_id(nom)
+                    if vid and state.CONNECTED_CLIENTS:
+                        await send_web_youtube(vid, nom)
                     else:
-                        await parler(f"Très bien Syndou, je cherche {nom} sur YouTube.")
                         url = chercher_youtube(nom)
                         if url:
                             ouvrir_navigateur(url)
@@ -687,11 +759,90 @@ async def traiter_commande_entiere(texte_utilisateur, mobile_ws=None):
                     await parler("Quelle musique souhaitez-vous écouter ?")
 
             elif action == "chanter":
-                sujet = data.get("sujet", "VISION")
-                paroles = f"La la la... Je chante pour vous Syndou, un air sur {sujet}..."
+                sujet = data.get("sujet", data.get("nom", "chanson"))
                 if "anniversaire" in sujet.lower():
-                    paroles = "Joyeux anniversaire, Joyeux anniversaire Syndou ! Que cette journée soit brillante comme votre génie !"
-                await parler(paroles)
+                    await parler("Joyeux anniversaire Syndou ! Je vous joue la chanson directement sur l'interface.")
+                    recherche = "Joyeux Anniversaire chanson"
+                elif not sujet or sujet.lower() in ["vision", "une chanson joyeuse", "quelque chose", "un truc", "chanson"]:
+                    await parler("C'est parti Syndou, je vous joue un bon morceau en direct.")
+                    recherche = "chanson française du moment"
+                else:
+                    await parler(f"C'est parti Syndou, je vous joue {sujet} sur votre interface.")
+                    recherche = sujet
+
+                vid = chercher_youtube_id(recherche)
+                if vid and state.CONNECTED_CLIENTS:
+                    await send_web_youtube(vid, recherche)
+                else:
+                    url = chercher_youtube(recherche)
+                    if url:
+                        ouvrir_navigateur(url)
+                    else:
+                        ouvrir_navigateur(f"https://www.youtube.com/results?search_query={recherche.replace(' ', '+')}")
+
+            elif action == "generer_musique":
+                prompt = data.get("prompt", "")
+                style = data.get("style", "moderne")
+                await parler(f"Je génère une musique {style} pour vous, Syndou. Ça peut prendre une à deux minutes, je vous préviens dès que c'est prêt.")
+
+                # Lancer la génération en tâche de fond avec messages d'avancement
+                async def _generer_avec_progression():
+                    import time as _time
+                    t0 = _time.time()
+                    fut = asyncio.get_event_loop().run_in_executor(None, generer_musique, prompt, style)
+
+                    # Messages de patienter toutes les 35 secondes
+                    messages_attente = [
+                        "La musique est en cours de création... encore un peu de patience.",
+                        "Je finalise votre création musicale, presque prêt Syndou !",
+                    ]
+                    idx = 0
+                    while not fut.done():
+                        try:
+                            await asyncio.wait_for(asyncio.shield(fut), timeout=35)
+                            break
+                        except asyncio.TimeoutError:
+                            if not fut.done() and idx < len(messages_attente):
+                                await parler(messages_attente[idx])
+                                idx += 1
+
+                    ok, result = await fut
+                    elapsed = round(_time.time() - t0)
+                    print(f"[AI MUSIC] Génération terminée en {elapsed}s → {str(result)[:80]}")
+
+                    if ok:
+                        await parler("C'est prêt ! Je lance votre création musicale sur l'interface.")
+                        try:
+                            mobile_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "mobile")
+                            os.makedirs(mobile_dir, exist_ok=True)
+                            dest_path = os.path.join(mobile_dir, "generated_music.wav")
+
+                            # Si result est un chemin local, on copie. Si c'est une URL, on l'envoie directement.
+                            if result.startswith("http"):
+                                audio_url = result
+                            else:
+                                shutil.copy2(result, dest_path)
+                                audio_url = f"http://{LOCAL_IP}:8080/generated_music.wav"
+
+                            await send_web_audio(audio_url, f"Musique {style} — {prompt[:30]}")
+                        except Exception as e:
+                            print(f"[MUSIC WEB ERROR] {e}")
+                            ouvrir_navigateur(result)
+                    else:
+                        await parler(f"Désolé Syndou, la génération a échoué. {result}")
+
+                asyncio.ensure_future(_generer_avec_progression())
+
+
+            elif action == "recherche_musique_ai":
+                query = data.get("query", "")
+                await parler(f"Je recherche une musique correspondant à : {query}...")
+                result, err = await asyncio.to_thread(rechercher_musique_ai, query)
+                if err:
+                    await parler(f"Je n'ai pas pu effectuer la recherche. {err}")
+                else:
+                    res_text = str(result)[:500]
+                    await parler(f"Voici ce que j'ai trouvé pour votre recherche : {res_text}")
 
             # ── WHATSAPP ─────────────────────────────────────────────────
             elif action == "whatsapp_appel":
