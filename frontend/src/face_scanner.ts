@@ -44,6 +44,8 @@ export function initFaceScanner(sendWsMsg: (data: any) => void): void {
 }
 
 function createModalHTML(): void {
+  if (document.getElementById("face-scanner-modal")) return;
+
   modalEl = document.createElement("div");
   modalEl.id = "face-scanner-modal";
   modalEl.className = "face-modal-hidden";
@@ -56,30 +58,32 @@ function createModalHTML(): void {
           <span class="face-title-text">SCANNER BIOMÉTRIQUE // FACE ID</span>
         </div>
         <div class="face-header-controls">
-          <button id="face-tab-scan-btn" class="face-tab-btn active" title="Vue Caméra & Points">👁️ Live</button>
-          <button id="face-tab-manage-btn" class="face-tab-btn" title="Gérer les profils enregistrés">👥 Visages (<span id="face-count-badge">0</span>)</button>
-          <button id="face-close-btn" class="face-close-btn" title="Fermer le scanner">✕</button>
+          <button id="face-tab-scan-btn" class="face-tab-btn active" type="button" title="Vue Caméra & Points">👁️ Live</button>
+          <button id="face-tab-manage-btn" class="face-tab-btn" type="button" title="Gérer les profils">👥 Profils (<span id="face-count-badge">0</span>)</button>
+          <button id="face-close-btn" class="face-close-btn" type="button" title="Fermer le scanner">✕</button>
         </div>
       </div>
 
-      <!-- Main Body Container -->
-      <div class="face-modal-body">
-        <!-- TAB 1: Live Scanner View -->
-        <div id="face-tab-scanner" class="face-tab-content active">
-          <div class="face-viewport-wrapper">
-            <video id="face-webcam-video" playsinline muted autoplay></video>
-            <canvas id="face-mesh-canvas"></canvas>
-            <div id="face-hud-overlay" class="face-hud-overlay">
-              <div class="face-hud-crosshair tl"></div>
-              <div class="face-hud-crosshair tr"></div>
-              <div class="face-hud-crosshair bl"></div>
-              <div class="face-hud-crosshair br"></div>
-              <div id="face-status-badge" class="face-status-badge">RECHERCHE DE VISAGE...</div>
-              <div id="face-tag-label" class="face-tag-label"></div>
-            </div>
+      <!-- Persistent Camera Viewport (Always active & visible) -->
+      <div class="face-viewport-container">
+        <div class="face-viewport-wrapper">
+          <video id="face-webcam-video" playsinline muted autoplay></video>
+          <canvas id="face-mesh-canvas"></canvas>
+          <div id="face-hud-overlay" class="face-hud-overlay">
+            <div class="face-hud-crosshair tl"></div>
+            <div class="face-hud-crosshair tr"></div>
+            <div class="face-hud-crosshair bl"></div>
+            <div class="face-hud-crosshair br"></div>
+            <div id="face-status-badge" class="face-status-badge">RECHERCHE DE VISAGE...</div>
+            <div id="face-tag-label" class="face-tag-label"></div>
           </div>
+        </div>
+      </div>
 
-          <!-- Bottom Actions Bar -->
+      <!-- Main Body Container with Tabs -->
+      <div class="face-modal-body">
+        <!-- TAB 1: Live Controls -->
+        <div id="face-tab-scanner" class="face-tab-content active">
           <div class="face-scanner-actions">
             <button id="face-scan-now-btn" class="face-btn face-btn-primary" type="button">
               🔍 Identifier la personne
@@ -94,17 +98,17 @@ function createModalHTML(): void {
         <div id="face-tab-manager" class="face-tab-content">
           <!-- Add Form Section -->
           <div class="face-add-section">
-            <div class="face-section-title">Enregistrer une nouvelle personne</div>
+            <div class="face-section-title">Ajouter une nouvelle personne</div>
             <div class="face-add-form">
               <div class="face-preview-box">
                 <img id="face-capture-preview" src="" alt="Capture" />
                 <button id="face-recapture-btn" type="button" class="face-btn-mini">📸 Capturer</button>
               </div>
               <div class="face-inputs-col">
-                <input id="face-input-name" type="text" placeholder="Prénom / Nom (ex: Syndou, Sarah...)" />
-                <input id="face-input-relation" type="text" placeholder="Relation (ex: Ami, Famille, Collègue...)" />
+                <input id="face-input-name" type="text" placeholder="Prénom / Nom (ex: Syndou, Sarah...)" autocomplete="off" />
+                <input id="face-input-relation" type="text" placeholder="Relation (ex: Ami, Famille, Collègue...)" autocomplete="off" />
                 <button id="face-save-btn" type="button" class="face-btn face-btn-primary">
-                  💾 Enregistrer le profil
+                  💾 Enregistrer ce profil
                 </button>
               </div>
             </div>
@@ -196,7 +200,6 @@ export async function openFaceScanner(): Promise<void> {
   if (!modalEl) createModalHTML();
   modalEl?.classList.remove("face-modal-hidden");
 
-  // Démarrer la caméra et FaceMesh
   await startFaceMesh();
   requestFacesList();
 }
@@ -250,7 +253,7 @@ async function startFaceMesh(): Promise<void> {
 
     camera = new Camera(videoEl, {
       onFrame: async () => {
-        if (faceMesh && videoEl && isOpen && currentTab === "scanner") {
+        if (faceMesh && videoEl && isOpen) {
           await faceMesh.send({ image: videoEl });
         }
       },
@@ -259,7 +262,8 @@ async function startFaceMesh(): Promise<void> {
     });
 
     await camera.start();
-    showFaceToast("✅ Scanner Biométrique activé", "success");
+    showFaceToast("✅ Scanner Biométrique connecté", "success");
+    captureCurrentSnapshot();
   } catch (err) {
     console.error("[FACE SCANNER] Erreur caméra/FaceMesh:", err);
     showFaceToast("❌ Impossible d'accéder à la webcam", "error");
@@ -306,7 +310,6 @@ function onFaceMeshResults(results: Results): void {
   const h = canvasEl.height;
 
   for (const landmarks of results.multiFaceLandmarks) {
-    // Calcul de la Bounding Box du visage
     let minX = w, maxX = 0, minY = h, maxY = 0;
     for (const pt of landmarks) {
       const px = pt.x * w;
@@ -317,18 +320,12 @@ function onFaceMeshResults(results: Results): void {
       if (py > maxY) maxY = py;
     }
 
-    // 1. Dessiner le maillage cybernétique / triangles
-    ctx.strokeStyle = "rgba(0, 242, 254, 0.22)";
-    ctx.lineWidth = 0.5;
-
-    // 2. Dessiner les points biométriques (468 landmarks)
+    // 1. Dessiner les points biométriques (Landmarks)
     ctx.fillStyle = "#00f2fe";
     for (let i = 0; i < landmarks.length; i++) {
       const pt = landmarks[i];
       const px = pt.x * w;
       const py = pt.y * h;
-
-      // Points clés plus visibles (yeux, nez, bouche)
       const isKeyPoint = i % 4 === 0 || (i >= 468);
       if (isKeyPoint) {
         ctx.beginPath();
@@ -337,7 +334,7 @@ function onFaceMeshResults(results: Results): void {
       }
     }
 
-    // 3. Contours des Yeux & Lèvres en vert néon
+    // 2. Contours des Yeux & Lèvres en néon
     const leftEyeIndices = [33, 133, 159, 145, 153, 144];
     const rightEyeIndices = [362, 263, 386, 374, 380, 373];
     const lipsIndices = [61, 291, 0, 17, 84, 314];
@@ -346,7 +343,7 @@ function onFaceMeshResults(results: Results): void {
     drawContour(landmarks, rightEyeIndices, w, h, "#10b981", 1.5);
     drawContour(landmarks, lipsIndices, w, h, "#38bdf8", 1.5);
 
-    // 4. Bounding Box HUD avec coins stylisés
+    // 3. Bounding Box HUD
     const pad = 16;
     const boxX = Math.max(0, minX - pad);
     const boxY = Math.max(0, minY - pad);
@@ -355,13 +352,13 @@ function onFaceMeshResults(results: Results): void {
 
     drawHudReticle(ctx, boxX, boxY, boxW, boxH);
 
-    // 5. Affichage du Nom au-dessus du visage
+    // 4. Affichage du Nom au-dessus du visage
     if (tagLabel) {
       tagLabel.style.display = "block";
       tagLabel.style.left = `${boxX + boxW / 2}px`;
       tagLabel.style.top = `${Math.max(10, boxY - 28)}px`;
 
-      if (identifiedPerson && identifiedPerson.name !== "Inconnu") {
+      if (identifiedPerson && identifiedPerson.name && identifiedPerson.name !== "Inconnu" && identifiedPerson.name !== "Visage non enregistré") {
         tagLabel.innerHTML = `👤 <strong>${identifiedPerson.name.toUpperCase()}</strong> <span class="tag-conf">${Math.round((identifiedPerson.confidence || 0.95) * 100)}%</span>`;
         tagLabel.className = "face-tag-label verified";
       } else {
@@ -371,7 +368,7 @@ function onFaceMeshResults(results: Results): void {
     }
 
     if (statusBadge) {
-      if (identifiedPerson && identifiedPerson.name !== "Inconnu") {
+      if (identifiedPerson && identifiedPerson.name && identifiedPerson.name !== "Inconnu" && identifiedPerson.name !== "Visage non enregistré") {
         statusBadge.textContent = `IDENTIFIÉ : ${identifiedPerson.name.toUpperCase()}`;
         statusBadge.className = "face-status-badge verified";
       } else {
@@ -383,9 +380,8 @@ function onFaceMeshResults(results: Results): void {
 
   ctx.restore();
 
-  // Auto-scan périodique toutes les 12 secondes si aucun nom identifié
   const now = Date.now();
-  if (now - lastAutoScanTime > 12000 && (!identifiedPerson || identifiedPerson.name === "Inconnu")) {
+  if (now - lastAutoScanTime > 14000 && (!identifiedPerson || identifiedPerson.name === "Inconnu" || identifiedPerson.name === "Visage non enregistré")) {
     lastAutoScanTime = now;
     triggerFaceIdentification(true);
   }
@@ -447,7 +443,7 @@ function drawHudReticle(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
 }
 
 // ── Capture Instantanée pour Enregistrement / Identification ─────────────────
-function captureCurrentFrameBase64(): string | null {
+export function captureCurrentFrameBase64(): string | null {
   if (!videoEl || videoEl.readyState < 2) return null;
   const offscreen = document.createElement("canvas");
   offscreen.width = videoEl.videoWidth || 640;
@@ -455,7 +451,7 @@ function captureCurrentFrameBase64(): string | null {
   const offCtx = offscreen.getContext("2d");
   if (!offCtx) return null;
   offCtx.drawImage(videoEl, 0, 0, offscreen.width, offscreen.height);
-  return offscreen.toDataURL("image/jpeg", 0.85);
+  return offscreen.toDataURL("image/jpeg", 0.9);
 }
 
 function captureCurrentSnapshot(): void {
@@ -498,14 +494,21 @@ function handleSaveFace(): void {
 
   const name = nameInput?.value.trim();
   const relation = relationInput?.value.trim() || "Ami";
-  const image_b64 = preview?.src;
 
   if (!name) {
     showFaceToast("Veuillez saisir un nom pour cette personne", "error");
+    nameInput?.focus();
     return;
   }
+
+  // Tente de récupérer l'image de la prévisualisation ou capture en direct
+  let image_b64 = preview?.src;
   if (!image_b64 || !image_b64.startsWith("data:image")) {
-    showFaceToast("Veuillez capturer une photo de la caméra", "error");
+    image_b64 = captureCurrentFrameBase64() || "";
+  }
+
+  if (!image_b64 || !image_b64.startsWith("data:image")) {
+    showFaceToast("Impossible de capturer la photo de la caméra", "error");
     return;
   }
 
@@ -520,7 +523,9 @@ function handleSaveFace(): void {
 
     nameInput.value = "";
     relationInput.value = "";
-    showFaceToast(`Enregistrement de ${name}...`, "info");
+    showFaceToast(`Enregistrement de "${name}" en cours...`, "info");
+  } else {
+    showFaceToast("Connexion au serveur perdue", "error");
   }
 }
 
@@ -562,7 +567,7 @@ export function handleFaceWsMessage(data: any): void {
   } else if (action === "face_recognized") {
     isScanning = false;
     const res = data.result || {};
-    if (res.identified && res.name && res.name !== "Inconnu") {
+    if (res.identified && res.name && res.name !== "Inconnu" && res.name !== "Visage non enregistré") {
       identifiedPerson = {
         name: res.name,
         confidence: res.confidence || 0.95,
@@ -583,8 +588,8 @@ function renderFacesGallery(): void {
   if (knownFaces.length === 0) {
     gallery.innerHTML = `
       <div class="face-empty-state">
-        <span>Aucun visage mémorisé pour le moment.</span>
-        <small>Utilisez le formulaire ci-dessus pour enregistrer un profil.</small>
+        <span>Aucun profil mémorisé pour le moment.</span>
+        <small>Utilisez le formulaire ci-dessus pour enregistrer un visage.</small>
       </div>
     `;
     return;

@@ -3424,3 +3424,7 @@ body[data-profile="adjoua"] #mediapipe-gesture-badge {
   border-color: rgba(239, 68, 68, 0.6);
   color: #f87171;
 }
+
+.face-viewport-container {
+  padding: 14px 16px 0 16px;
+}
