@@ -67,6 +67,37 @@ async def ws_handler(websocket):
                     msg = json.dumps({"action": "history_ui", "history": state.history_ui})
                     await websocket.send(msg)
 
+                elif msg_type == "get_faces":
+                    from modules.face_recognition_system import get_personnes_with_photos
+                    faces = get_personnes_with_photos()
+                    await websocket.send(json.dumps({"action": "faces_list", "faces": faces}))
+
+                elif msg_type == "save_face":
+                    from modules.face_recognition_system import enregistrer_visage_direct, get_personnes_with_photos
+                    nom = data.get("name", "")
+                    relation = data.get("relation", "ami")
+                    notes = data.get("notes", "")
+                    img_b64 = data.get("image_b64", "")
+                    res = enregistrer_visage_direct(nom, relation, notes, img_b64)
+                    faces = get_personnes_with_photos()
+                    # Envoi à tous les clients connectés
+                    broadcast_msg = json.dumps({"action": "faces_list", "faces": faces, "notification": res.get("message", "")})
+                    await asyncio.gather(*[ws.send(broadcast_msg) for ws in state.CONNECTED_CLIENTS], return_exceptions=True)
+
+                elif msg_type == "delete_face":
+                    from modules.face_recognition_system import supprimer_visage, get_personnes_with_photos
+                    nom = data.get("name", "")
+                    res_msg = supprimer_visage(nom)
+                    faces = get_personnes_with_photos()
+                    broadcast_msg = json.dumps({"action": "faces_list", "faces": faces, "notification": res_msg})
+                    await asyncio.gather(*[ws.send(broadcast_msg) for ws in state.CONNECTED_CLIENTS], return_exceptions=True)
+
+                elif msg_type == "recognize_face_frame":
+                    from modules.face_recognition_system import reconnaitre_frame_direct
+                    img_b64 = data.get("image_b64", "")
+                    result = await reconnaitre_frame_direct(img_b64)
+                    await websocket.send(json.dumps({"action": "face_recognized", "result": result}))
+
             except Exception as e:
                 print(f"[WEB] Erreur traitement message : {e}")
     except Exception:

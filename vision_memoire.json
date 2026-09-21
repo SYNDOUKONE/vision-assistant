@@ -48,10 +48,6 @@
   },
   "sessions": [
     {
-      "timestamp": "21/07/2026 13:44",
-      "resume": "Syndou a activé le mode Iron Man de son assistant vocal VISION."
-    },
-    {
       "timestamp": "21/07/2026 13:50",
       "resume": "Désactivation du mode Iron Man et analyse visuelle d'un smartphone par l'assistant."
     },
@@ -126,6 +122,10 @@
     {
       "timestamp": "21/09/2026 14:11",
       "resume": "Bonjour et introduction entre Syndou et VISION."
+    },
+    {
+      "timestamp": "21/09/2026 14:42",
+      "resume": "Explication et dépannage de la reconnaissance faciale pour identifier Syndou et Koné."
     }
   ]
 }

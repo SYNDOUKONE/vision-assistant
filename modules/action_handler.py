@@ -236,6 +236,17 @@ async def traiter_commande_entiere(texte_utilisateur, mobile_ws=None):
             await send_web_text(texte_utilisateur, reponse_txt)
             return
 
+    # Scanner biométrique & reconnaissance faciale
+    if not reponse:
+        if any(kw in t_lower for kw in ["reconnaissance faciale", "scanner facial", "scanner de visage", "scanner le visage", "scanne mon visage", "analyse mon visage", "qui est devant la caméra"]):
+            if state.CONNECTED_CLIENTS:
+                msg = json.dumps({"action": "open_face_scanner"})
+                await asyncio.gather(*[ws.send(msg) for ws in state.CONNECTED_CLIENTS], return_exceptions=True)
+            reponse_txt = "J'active le scanner biométrique et la reconnaissance faciale sur votre interface Syndou."
+            await parler(reponse_txt)
+            await send_web_text(texte_utilisateur, reponse_txt)
+            return
+
     # Vision écran
     if not reponse:
         t = texte_utilisateur.lower()

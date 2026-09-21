@@ -15,6 +15,7 @@ import { showCarte, hideCarte } from "./carte3d";
 import { initWallpaperSystem } from "./wallpaper";
 import { vision3D } from "./vision3d_interactions";
 import { initRadioModule, openRadioModal, closeRadioModal, playStationByName } from "./radio";
+import { initFaceScanner, toggleFaceScanner, handleFaceWsMessage, closeFaceScanner } from "./face_scanner";
 import "./style.css";
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -371,6 +372,14 @@ function connect(): void {
         }
         return;
       }
+      if (data.action === "faces_list" || data.action === "face_recognized") {
+        handleFaceWsMessage(data);
+        return;
+      }
+      if (data.action === "open_face_scanner") {
+        toggleFaceScanner();
+        return;
+      }
       if (data.state) {
         applyState(data.state as OrbState);
       }
@@ -477,6 +486,19 @@ injectGestureButton((data) => {
 initWallpaperSystem();
 initRadioModule();
 
+initFaceScanner((data) => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(data));
+  }
+});
+
+const faceLauncherBtn = document.getElementById("face-scanner-launcher-btn");
+if (faceLauncherBtn) {
+  faceLauncherBtn.addEventListener("click", () => {
+    toggleFaceScanner();
+  });
+}
+
 const radioLauncherBtn = document.getElementById("radio-launcher-btn");
 if (radioLauncherBtn) {
   radioLauncherBtn.addEventListener("click", () => {
@@ -515,11 +537,12 @@ window.addEventListener("profileSelected", (e: Event) => {
   }, 800);
 });
 
-// Escape ferme la carte et la radio
+// Escape ferme la carte, la radio et le scanner de visage
 window.addEventListener("keydown", (e: KeyboardEvent) => {
   if (e.key === "Escape") {
     hideCarte();
     closeRadioModal();
+    closeFaceScanner();
   }
 });
 

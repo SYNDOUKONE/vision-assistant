@@ -260,3 +260,136 @@ def supprimer_visage(nom: str) -> str:
                 print(f"[RECONNAISSANCE] Erreur suppression fichier image : {e}")
 
     return f"Le visage et le profil de {trouve_cle} ont été supprimés avec succès de ma mémoire."
+
+
+def enregistrer_visage_direct(nom: str, relation: str = "ami", notes: str = "", img_b64: str = "") -> dict:
+    """Enregistre un visage directement à partir d'une image base64 fournie par le frontend."""
+    if not nom or not nom.strip():
+        return {"success": False, "message": "Nom manquant pour l'enregistrement."}
+    if not img_b64:
+        return {"success": False, "message": "Capture d'image manquante."}
+
+    nom_clean = nom.strip()
+    slug = _nettoyer_nom_fichier(nom_clean)
+    if not slug:
+        return {"success": False, "message": "Nom invalide."}
+
+    _init_storage()
+
+    try:
+        # Nettoyage header data:image/jpeg;base64,... si présent
+        if "," in img_b64:
+            img_b64 = img_b64.split(",", 1)[1]
+
+        img_bytes = base64.b64decode(img_b64)
+        img = Image.open(io.BytesIO(img_bytes))
+
+        filename = f"{slug}.jpg"
+        filepath = os.path.join(FACES_DIR, filename)
+        img.convert("RGB").save(filepath, "JPEG", quality=90)
+
+        personnes = charger_personnes()
+        date_str = datetime.now().strftime("%d/%m/%Y à %H:%M")
+        personnes[nom_clean] = {
+            "nom": nom_clean,
+            "slug": slug,
+            "fichier": filename,
+            "relation": relation.strip() if relation else "ami(e)",
+            "notes": notes.strip() if notes else "",
+            "date_enregistrement": date_str,
+            "derniere_vue": date_str
+        }
+        sauvegarder_personnes(personnes)
+        print(f"[RECONNAISSANCE] Visage enregistré via UI : {nom_clean} ({filename})")
+        return {
+            "success": True,
+            "message": f"Visage de {nom_clean} enregistré avec succès.",
+            "personne": personnes[nom_clean]
+        }
+    except Exception as e:
+        print(f"[RECONNAISSANCE ERROR ENREGISTRER DIRECT] {e}")
+        return {"success": False, "message": f"Erreur : {str(e)}"}
+
+
+def get_personnes_with_photos() -> list:
+    """Retourne la liste des personnes enregistrées avec leur photo en base64 pour la galerie UI."""
+    personnes = charger_personnes()
+    res = []
+    for nom, info in personnes.items():
+        item = dict(info)
+        fname = info.get("fichier")
+        item["photo_b64"] = ""
+        if fname:
+            fpath = os.path.join(FACES_DIR, fname)
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "rb") as f:
+                        item["photo_b64"] = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode("utf-8")
+                except Exception as e:
+                    print(f"[RECONNAISSANCE] Erreur lecture photo {fname}: {e}")
+        res.append(item)
+    return res
+
+
+async def reconnaitre_frame_direct(img_b64: str) -> dict:
+    """Analyse rapide d'une frame webcam pour identifier le nom de la personne parmi les profils enregistrés."""
+    _init_storage()
+    if not img_b64:
+        return {"identified": False, "name": "Inconnu", "confidence": 0.0}
+
+    try:
+        if "," in img_b64:
+            img_b64 = img_b64.split(",", 1)[1]
+
+        img_bytes = base64.b64decode(img_b64)
+        current_img = Image.open(io.BytesIO(img_bytes))
+        personnes = charger_personnes()
+
+        if not personnes:
+            return {"identified": False, "name": "Visage non enregistré", "confidence": 0.0, "details": "Aucun profil dans la base"}
+
+        contents = [
+            "Tu es un module de reconnaissance faciale biométrique ultra-précis.",
+            "Voici les visages et profils enregistrés dans la base :"
+        ]
+
+        for nom, info in personnes.items():
+            fname = info.get("fichier")
+            if fname:
+                fpath = os.path.join(FACES_DIR, fname)
+                if os.path.exists(fpath):
+                    try:
+                        ref_img = Image.open(fpath)
+                        contents.append(f"Personne : {nom}")
+                        contents.append(ref_img)
+                    except Exception:
+                        pass
+
+        prompt = (
+            "Voici l'image actuelle capturée par la caméra.\n"
+            "Compare attentivement le visage présent avec les photos de référence fournies.\n"
+            "Réponds STRICTEMENT au format JSON valide suivant, sans aucun texte autour :\n"
+            '{"identified": true, "name": "Nom de la personne", "confidence": 0.95, "relation": "..."} ou {"identified": false, "name": "Inconnu", "confidence": 0.0}'
+        )
+        contents.append(prompt)
+        contents.append(current_img)
+
+        from modules.config import gemini_client, MODELS_LIST
+        response = await asyncio.to_thread(
+            gemini_client.models.generate_content,
+            model=MODELS_LIST[0] if MODELS_LIST else "gemini-2.5-flash",
+            contents=contents
+        )
+        if response and response.text:
+            text = response.text.strip()
+            if "```json" in text:
+                text = text.split("```json", 1)[1].split("```", 1)[0].strip()
+            elif "```" in text:
+                text = text.split("```", 1)[1].split("```", 1)[0].strip()
+            data = json.loads(text)
+            return data
+    except Exception as e:
+        print(f"[RECONNAISSANCE FRAME DIRECT ERROR] {e}")
+
+    return {"identified": False, "name": "Inconnu", "confidence": 0.0}
+
