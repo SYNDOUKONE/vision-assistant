@@ -1,6 +1,6 @@
 """
 VISION — Synthèse Vocale & Écoute
-TTS (edge_tts), parler(), nettoyer_commande().
+TTS prioritaire : ElevenLabs (si clé disponible), sinon edge_tts.
 """
 
 import os
@@ -17,6 +17,42 @@ import edge_tts
 from modules import state
 from modules.config import genai_types
 from modules.websocket_server import send_web_state, send_web_volume, send_web_text
+
+# ── ElevenLabs TTS ─────────────────────────────────────────────────
+ELEVENLABS_KEY = os.getenv("ELEVENLABS_API_KEY", "")
+_elevenlabs_client = None
+ELEVENLABS_VOICE_VISION = "onwK4e9ZLuTAKqWW03F9"  # Daniel — Steady Broadcaster (accent britannique formel, parfait pour JARVIS)
+ELEVENLABS_VOICE_ADJOUA = "cgSgspJ2msm6clMCkdW9"  # Jessica — Playful, Bright, Warm (voix féminine chaleureuse)
+
+if ELEVENLABS_KEY:
+    try:
+        from elevenlabs import ElevenLabs
+        _elevenlabs_client = ElevenLabs(api_key=ELEVENLABS_KEY)
+        print("[TTS] ElevenLabs activé — voix HD disponible.")
+    except Exception as _e:
+        print(f"[TTS] ElevenLabs non disponible : {_e}")
+
+
+def parler_elevenlabs(texte: str, output_file: str = "vision_tts.mp3") -> bool:
+    """Génère l'audio via ElevenLabs et sauvegarde dans output_file."""
+    if not _elevenlabs_client:
+        return False
+    try:
+        voice_id = ELEVENLABS_VOICE_ADJOUA if state.PROFIL_ACTIF == "adjoua" else ELEVENLABS_VOICE_VISION
+        audio_gen = _elevenlabs_client.text_to_speech.convert(
+            voice_id=voice_id,
+            text=texte,
+            model_id="eleven_multilingual_v2",
+            output_format="mp3_44100_128",
+        )
+        with open(output_file, "wb") as f:
+            for chunk in audio_gen:
+                if chunk:
+                    f.write(chunk)
+        return True
+    except Exception as e:
+        print(f"[ElevenLabs] Erreur TTS : {e}")
+        return False
 
 
 import queue
@@ -102,11 +138,11 @@ def parler_sync_internal(texte_tts, style, skip_pc):
     """Moteur interne synchrone du TTS s'exécutant dans le thread de la queue."""
     tmp = "vision_tts.mp3"
     
-    # Voix selon le profil actif
+    # Voix edge_tts de secours selon le profil actif
     if state.PROFIL_ACTIF == "adjoua":
-        voix = "fr-FR-DeniseNeural"  # Voix féminine douce pour ADJOUA
+        voix_edge = "fr-FR-DeniseNeural"
     else:
-        voix = "fr-FR-HenriNeural" if style == "doux" else "fr-FR-DeniseNeural"
+        voix_edge = "fr-FR-HenriNeural" if style == "doux" else "fr-FR-DeniseNeural"
     
     state.is_speaking = True
     safe_send_web_state("speaking")
@@ -114,14 +150,16 @@ def parler_sync_internal(texte_tts, style, skip_pc):
     utilisé_fallback = False
     
     try:
-        # 1. edge_tts save
-        async def do_save():
-            communicate = edge_tts.Communicate(texte_tts, voice=voix, rate=state.tts_rate)
-            await communicate.save(tmp)
-            
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(do_save())
-        loop.close()
+        # 1. Essayer ElevenLabs en priorité
+        if not parler_elevenlabs(texte_tts, tmp):
+            # Fallback edge_tts
+            async def do_save():
+                communicate = edge_tts.Communicate(texte_tts, voice=voix_edge, rate=state.tts_rate)
+                await communicate.save(tmp)
+                
+            loop = asyncio.new_event_loop()
+            loop.run_until_complete(do_save())
+            loop.close()
         
         # 2. Lecture
         if skip_pc:
