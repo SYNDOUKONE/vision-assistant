@@ -28,6 +28,23 @@ from modules.websocket_server import send_web_state, request_screen_capture
 from modules.web_search import recherche_web_serpapi
 from modules.local_solvers import reponse_locale
 
+# ── Nouveaux modules Jarvis ───────────────────────────────────────────────────
+try:
+    from modules.historique_commandes import enregistrer_commande, resumer_historique_commandes
+    from modules.memoire_longterme import extraire_et_apprendre, traiter_commande_memoire, generer_contexte_personnalise
+    from modules.memoire_adaptative import enregistrer_usage, traiter_commande_adaptative
+    from modules.emotion import detecter_emotion, adapter_reponse_emotion
+    from modules.calendrier import traiter_commande_calendrier
+    from modules.sante import traiter_commande_sante
+    from modules.dictee import traiter_commande_dictee, est_en_mode_dictee
+    from modules.contacts import traiter_commande_contacts
+    from modules.whatsapp_adb import traiter_commande_whatsapp
+    MODULES_JARVIS_OK = True
+    print("[VISION] Modules Jarvis chargés avec succès.")
+except Exception as e:
+    MODULES_JARVIS_OK = False
+    print(f"[VISION] Modules Jarvis partiellement chargés : {e}")
+
 
 def construire_system_prompt():
     contexte_memoire = construire_contexte_memoire()
@@ -425,6 +442,58 @@ async def demander_ia(texte):
     await send_web_state("thinking")
     try:
         t_low = texte.lower().strip()
+
+        # ── Modules Jarvis — traitement en priorité ───────────────────────────
+        if MODULES_JARVIS_OK:
+            # Enregistrer l'usage pour la mémoire adaptative
+            enregistrer_usage(texte)
+            # Extraire et apprendre des faits
+            extraire_et_apprendre(texte)
+
+            # Mode dictée (priorité absolue si actif)
+            rep_dictee = traiter_commande_dictee(texte)
+            if rep_dictee is not None:
+                return rep_dictee
+
+            # Mémoire long terme (se souvenir, mémoriser)
+            rep_memoire = traiter_commande_memoire(texte)
+            if rep_memoire is not None:
+                enregistrer_commande(texte, rep_memoire, "memoire")
+                return rep_memoire
+
+            # Historique commandes
+            rep_hist = resumer_historique_commandes(texte)
+            if rep_hist is not None:
+                return rep_hist
+
+            # Mémoire adaptative
+            rep_adapt = traiter_commande_adaptative(texte)
+            if rep_adapt is not None:
+                return rep_adapt
+
+            # Calendrier local
+            rep_cal = traiter_commande_calendrier(texte)
+            if rep_cal is not None:
+                enregistrer_commande(texte, rep_cal, "calendrier")
+                return rep_cal
+
+            # Santé
+            rep_sante = traiter_commande_sante(texte)
+            if rep_sante is not None:
+                enregistrer_commande(texte, rep_sante, "sante")
+                return rep_sante
+
+            # Contacts
+            rep_contact = traiter_commande_contacts(texte)
+            if rep_contact is not None:
+                enregistrer_commande(texte, rep_contact, "contacts")
+                return rep_contact
+
+            # WhatsApp / ADB
+            rep_wa = traiter_commande_whatsapp(texte)
+            if rep_wa is not None:
+                enregistrer_commande(texte, rep_wa, "whatsapp")
+                return rep_wa
 
         # ── LLM cascade ──
         cerveau = detecter_cerveau(texte)
