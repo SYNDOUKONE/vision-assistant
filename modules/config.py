@@ -8,8 +8,9 @@ import os
 import socket
 from dotenv import load_dotenv
 
-# ── Chargement .env ──────────────────────────────────────────────────────────
-load_dotenv()
+# ── Chargement .env / env ──────────────────────────────────────────────────
+load_dotenv("env")
+load_dotenv(".env")
 
 # ── Réseau ───────────────────────────────────────────────────────────────────
 def get_local_ip():
@@ -40,6 +41,7 @@ DEEPL_API_KEY         = os.getenv("DEEPL_API_KEY")
 HUGGINGFACE_API_KEY   = os.getenv("HUGGINGFACE_API_KEY")
 AIMUSIC_API_KEY       = os.getenv("AIMUSIC_API_KEY")
 EXPLABS_API_KEY       = os.getenv("EXPLABS_API_KEY")
+ELEVENLABS_API_KEY    = os.getenv("ELEVENLABS_API_KEY")
 
 # Spotify
 SPOTIPY_CLIENT_ID     = os.getenv("SPOTIPY_CLIENT_ID")
