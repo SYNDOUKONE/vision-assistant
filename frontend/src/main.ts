@@ -500,36 +500,50 @@ function initActiveProfile(profileName: "vision" | "adjoua"): void {
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-setConnected(false);
-applyState("idle");
-setMuted(false);
-initDrawer();
-injectVisionButton();
-injectWebcamButton();
-injectGestureButton((data) => {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(data));
-  }
-});
-initWallpaperSystem();
-initRadioModule();
-
-const radioLauncherBtn = document.getElementById("radio-launcher-btn");
-if (radioLauncherBtn) {
-  radioLauncherBtn.addEventListener("click", () => {
-    openRadioModal();
-  });
+try {
+  // 1. Initialize active profile & 3D Orb IMMEDIATELY (Core First)
+  const savedProfile = (localStorage.getItem("vision_profile") as "vision" | "adjoua") || "vision";
+  initActiveProfile(savedProfile);
+} catch (err) {
+  console.error("[VISION] Erreur d'initialisation de l'Orbe 3D:", err);
 }
 
-vision3D.init((data: any) => {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(data));
-  }
-});
+try { setConnected(false); } catch (e) {}
+try { applyState("idle"); } catch (e) {}
+try { setMuted(false); } catch (e) {}
+try { initDrawer(); } catch (e) { console.warn("[VISION] Init drawer warn:", e); }
+try { injectVisionButton(); } catch (e) {}
+try { injectWebcamButton(); } catch (e) {}
+try {
+  injectGestureButton((data) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(data));
+    }
+  });
+} catch (e) {
+  console.warn("[VISION] Init gesture warn:", e);
+}
+try { initWallpaperSystem(); } catch (e) { console.warn("[VISION] Init wallpaper warn:", e); }
+try { initRadioModule(); } catch (e) { console.warn("[VISION] Init radio warn:", e); }
 
-// Always initialize active profile & 3D Orb immediately on startup
-const savedProfile = (localStorage.getItem("vision_profile") as "vision" | "adjoua") || "vision";
-initActiveProfile(savedProfile);
+try {
+  const radioLauncherBtn = document.getElementById("radio-launcher-btn");
+  if (radioLauncherBtn) {
+    radioLauncherBtn.addEventListener("click", () => {
+      openRadioModal();
+    });
+  }
+} catch (e) {}
+
+try {
+  vision3D.init((data: any) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(data));
+    }
+  });
+} catch (e) {
+  console.warn("[VISION] Init vision3D warn:", e);
+}
 
 // Listen for profile selection (from the profile screen HTML/JS)
 window.addEventListener("profileSelected", (e: Event) => {
