@@ -222,30 +222,12 @@ class Vision3DManager {
   private injectHUDControls(): void {
     const container = document.createElement("div");
     container.id = "vision3d-controls";
-    container.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 9998;
-    `;
 
     const select = document.createElement("select");
-    select.style.cssText = `
-      padding: 10px 15px;
-      background: rgba(10, 15, 30, 0.85);
-      color: #fff;
-      border: 1px solid rgba(100,150,255,0.5);
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 14px;
-      font-family: 'Space Grotesk', sans-serif;
-      backdrop-filter: blur(10px);
-      outline: none;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    `;
+    select.className = "hud-select";
 
     const modules = [
-      { id: "none", label: "👁️ Aucun module (Désactivé)" },
+      { id: "none", label: "👁️ Aucun module" },
       { id: "orbe_magnetique", label: "🔮 Orbe Magnétique" },
       { id: "globe3d",         label: "🌍 Globe 3D" },
       { id: "hud_menu",        label: "🎯 Menu HUD" },
@@ -277,7 +259,13 @@ class Vision3DManager {
     });
 
     container.appendChild(select);
-    document.body.appendChild(container);
+
+    const rightGroup = document.querySelector("#top-hud-bar .hud-right");
+    if (rightGroup) {
+      rightGroup.insertBefore(container, rightGroup.firstChild);
+    } else {
+      document.body.appendChild(container);
+    }
   }
 
   destroy(): void {

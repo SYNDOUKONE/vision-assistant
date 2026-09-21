@@ -224,27 +224,32 @@ export function injectGestureButton(sendWsMsg: (data: any) => void) {
 
   const btn = document.createElement("button");
   btn.id = "gesture-control-button";
+  btn.className = "hud-dock-btn";
   btn.title = "Activer le contrôle par gestes (Index sur la bouche 🤫 ou Poing ✊ pour couper l'audio)";
-  btn.textContent = "✋ Gestes : Inactifs";
-  btn.style.cssText = "display:none;";
-
-  btn.onmouseover = () => { btn.style.background = "rgba(255, 215, 0, 0.25)"; btn.style.color = "#fff"; };
-  btn.onmouseout  = () => { btn.style.background = isGestureControlRunning() ? "rgba(46, 204, 113, 0.2)" : "rgba(255, 215, 0, 0.12)"; };
+  btn.innerHTML = "<span>🖐️ Gestes</span>";
 
   btn.onclick = async () => {
     if (isGestureControlRunning()) {
       stopGestureControl();
-      btn.textContent = "✋ Gestes : Inactifs";
-      btn.style.background = "rgba(255, 215, 0, 0.12)";
-      btn.style.color = "rgba(255,255,255,0.6)";
+      btn.innerHTML = "<span>🖐️ Gestes</span>";
+      btn.classList.remove("active");
     } else {
-      btn.textContent = "⏳ Démarrage...";
+      btn.innerHTML = "<span>⏳ Démarrage...</span>";
       const ok = await startGestureControl();
-      btn.textContent = ok ? "✋ Gestes : Actifs (🤫/✊)" : "❌ Caméra Refusée";
-      btn.style.background = ok ? "rgba(46, 204, 113, 0.25)" : "rgba(231, 76, 60, 0.25)";
-      btn.style.color = ok ? "#2ecc71" : "#e74c3c";
+      btn.innerHTML = ok ? "<span>✋ Gestes Actifs</span>" : "<span>❌ Caméra Refusée</span>";
+      btn.classList.toggle("active", ok);
     }
   };
 
-  document.body.appendChild(btn);
+  const dock = document.getElementById("bottom-hud-dock");
+  if (dock) {
+    const webcamBtn = document.getElementById("webcam-button");
+    if (webcamBtn && webcamBtn.nextSibling) {
+      dock.insertBefore(btn, webcamBtn.nextSibling);
+    } else {
+      dock.appendChild(btn);
+    }
+  } else {
+    document.body.appendChild(btn);
+  }
 }

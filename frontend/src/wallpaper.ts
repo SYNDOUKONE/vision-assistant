@@ -57,12 +57,19 @@ export function initWallpaperSystem(): void {
   wallpaperOverlayEl.id = "wallpaper-overlay";
   document.body.insertBefore(wallpaperOverlayEl, document.body.firstChild);
 
-  // Créer le bouton d'ouverture du panneau wallpaper (coin haut-droite)
+  // Créer le bouton d'ouverture du panneau wallpaper (top-right HUD)
   const wallpaperBtn = document.createElement("button");
   wallpaperBtn.id = "wallpaper-open-btn";
   wallpaperBtn.title = "Changer le fond d'écran";
-  wallpaperBtn.innerHTML = "🖼️";
-  document.body.appendChild(wallpaperBtn);
+  wallpaperBtn.className = "hud-btn";
+  wallpaperBtn.innerHTML = "🖼️ <span>FOND</span>";
+
+  const rightGroup = document.querySelector("#top-hud-bar .hud-right");
+  if (rightGroup) {
+    rightGroup.insertBefore(wallpaperBtn, rightGroup.firstChild);
+  } else {
+    document.body.appendChild(wallpaperBtn);
+  }
   wallpaperBtn.addEventListener("click", openWallpaperPanel);
 
   // Créer le panneau de sélection
@@ -281,7 +288,7 @@ function updatePresetsUI(activeSrc: string): void {
 }
 
 // ── Panneau open/close ────────────────────────────────────────────────────────
-export function openWallpaperPanel(): void {
+function openWallpaperPanel(): void {
   if (!wallpaperPanelEl) return;
   wallpaperPanelEl.classList.remove("wallpaper-panel-hidden");
   wallpaperPanelEl.classList.add("wallpaper-panel-visible");

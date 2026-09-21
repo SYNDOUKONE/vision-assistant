@@ -54,14 +54,19 @@ export async function captureFrame(): Promise<string | null> {
 export function injectVisionButton() {
   const btn = document.createElement("button");
   btn.id = "vision-button";
-  btn.textContent = "👁️ Activer la vision";
-  btn.style.cssText = "display:none;";
-  btn.onmouseover = () => { btn.style.background = "rgba(76, 168, 232, 0.3)"; btn.style.color = "#fff"; };
-  btn.onmouseout  = () => { btn.style.background = "rgba(76, 168, 232, 0.12)"; btn.style.color = "rgba(255,255,255,0.4)"; };
+  btn.className = "hud-dock-btn";
+  btn.innerHTML = "<span>👁️ Vision Écran</span>";
+
   btn.onclick = async () => {
     const ok = await enableScreenCapture();
-    btn.textContent = ok ? "👁️ Vision active" : "❌ Vision refusée";
-    btn.style.background = ok ? "#2ecc71" : "#e74c3c";
+    btn.innerHTML = ok ? "<span>👁️ Vision Active</span>" : "<span>❌ Vision Refusée</span>";
+    btn.classList.toggle("active", ok);
   };
-  document.body.appendChild(btn);
+
+  const dock = document.getElementById("bottom-hud-dock");
+  if (dock) {
+    dock.insertBefore(btn, dock.firstChild);
+  } else {
+    document.body.appendChild(btn);
+  }
 }

@@ -67,16 +67,24 @@ export async function captureWebcamFrame(): Promise<string | null> {
 export function injectWebcamButton() {
   const btn = document.createElement("button");
   btn.id = "webcam-button";
-  btn.textContent = "📷 Activer Caméra";
-  btn.style.cssText = "display:none;";
-  
-  btn.onmouseover = () => { btn.style.background = "rgba(76, 168, 232, 0.3)"; btn.style.color = "#fff"; };
-  btn.onmouseout  = () => { btn.style.background = "rgba(76, 168, 232, 0.12)"; btn.style.color = "rgba(255,255,255,0.4)"; };
-  
+  btn.className = "hud-dock-btn";
+  btn.innerHTML = "<span>📷 Caméra</span>";
+
   btn.onclick = async () => {
     const ok = await enableWebcam();
-    btn.textContent = ok ? "📷 Caméra Active" : "❌ Caméra Refusée";
-    btn.style.background = ok ? "rgba(46, 204, 113, 0.2)" : "rgba(231, 76, 60, 0.2)";
+    btn.innerHTML = ok ? "<span>📷 Caméra Active</span>" : "<span>❌ Caméra Refusée</span>";
+    btn.classList.toggle("active", ok);
   };
-  document.body.appendChild(btn);
+
+  const dock = document.getElementById("bottom-hud-dock");
+  if (dock) {
+    const visionBtn = document.getElementById("vision-button");
+    if (visionBtn && visionBtn.nextSibling) {
+      dock.insertBefore(btn, visionBtn.nextSibling);
+    } else {
+      dock.appendChild(btn);
+    }
+  } else {
+    document.body.appendChild(btn);
+  }
 }

@@ -19,42 +19,27 @@ from modules.config import genai_types
 from modules.websocket_server import send_web_state, send_web_volume, send_web_text
 
 # ── ElevenLabs TTS ─────────────────────────────────────────────────
+ELEVENLABS_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 _elevenlabs_client = None
 ELEVENLABS_VOICE_VISION = "onwK4e9ZLuTAKqWW03F9"  # Daniel — Steady Broadcaster (accent britannique formel, parfait pour JARVIS)
 ELEVENLABS_VOICE_ADJOUA = "cgSgspJ2msm6clMCkdW9"  # Jessica — Playful, Bright, Warm (voix féminine chaleureuse)
 
-def get_elevenlabs_client():
-    global _elevenlabs_client
-    if _elevenlabs_client is not None:
-        return _elevenlabs_client
-
-    key = os.getenv("ELEVENLABS_API_KEY", "")
-    if not key and os.path.exists("env"):
-        from dotenv import load_dotenv
-        load_dotenv("env")
-        key = os.getenv("ELEVENLABS_API_KEY", "")
-
-    if key:
-        try:
-            from elevenlabs import ElevenLabs
-            _elevenlabs_client = ElevenLabs(api_key=key)
-            print("[TTS] ElevenLabs activé — voix HD disponible.")
-            return _elevenlabs_client
-        except Exception as _e:
-            print(f"[TTS] ElevenLabs non disponible : {_e}")
-    return None
+if ELEVENLABS_KEY:
+    try:
+        from elevenlabs import ElevenLabs
+        _elevenlabs_client = ElevenLabs(api_key=ELEVENLABS_KEY)
+        print("[TTS] ElevenLabs activé — voix HD disponible.")
+    except Exception as _e:
+        print(f"[TTS] ElevenLabs non disponible : {_e}")
 
 
 def parler_elevenlabs(texte: str, output_file: str = "vision_tts.mp3") -> bool:
     """Génère l'audio via ElevenLabs et sauvegarde dans output_file."""
-    client = get_elevenlabs_client()
-    if not client:
+    if not _elevenlabs_client:
         return False
     try:
         voice_id = ELEVENLABS_VOICE_ADJOUA if state.PROFIL_ACTIF == "adjoua" else ELEVENLABS_VOICE_VISION
-        profil_nom = "ADJOUA" if state.PROFIL_ACTIF == "adjoua" else "VISION"
-        print(f"[ElevenLabs] Génération vocal HD pour {profil_nom} (voix ID: {voice_id})")
-        audio_gen = client.text_to_speech.convert(
+        audio_gen = _elevenlabs_client.text_to_speech.convert(
             voice_id=voice_id,
             text=texte,
             model_id="eleven_multilingual_v2",

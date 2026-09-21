@@ -3,159 +3,67 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VISION</title>
+    <title>VISION — Intelligence Artificielle</title>
   </head>
   <body>
     <!-- Three.js renders here -->
     <canvas id="orb-canvas"></canvas>
 
-    <!-- Status text above the label -->
+    <!-- ══ TOP HUD BAR ══════════════════════════════════════════════════════ -->
+    <header id="top-hud-bar">
+      <div class="hud-group hud-left">
+        <button id="switch-profile-btn" type="button" title="Changer d'assistant IA" onclick="showProfileScreen()">
+          <span class="hud-icon">⇄</span>
+          <span id="profile-btn-label">VISION</span>
+        </button>
+        <button id="mute-button" type="button" aria-pressed="false" aria-label="Couper le micro">
+          <span class="hud-mic-dot"></span>
+          <span id="mute-btn-text">MIC ACTIVE</span>
+        </button>
+      </div>
+
+      <div class="hud-group hud-center">
+        <div id="hud-brand">
+          <span class="brand-pulse"></span>
+          <span class="brand-title">V.I.S.I.O.N</span>
+          <span class="brand-sub">ONLINE</span>
+        </div>
+      </div>
+
+      <div class="hud-group hud-right">
+        <button id="radio-launcher-btn" type="button" title="Ouvrir la Radio FM / Web">
+          📻 <span>RADIO</span>
+        </button>
+        <div id="connection-badge">
+          <span id="connection-dot"></span>
+          <span id="connection-label">connexion</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Status text above bottom dock -->
     <div id="status-text"></div>
 
     <!-- Persistent label at the very bottom -->
     <div id="assistant-label">VISION</div>
 
-    <!-- Connection indicator — top-right -->
-    <div id="connection-badge">
-      <span id="connection-dot"></span>
-      <span id="connection-label">connexion</span>
-    </div>
+    <!-- ══ BOTTOM HUD FLOATING DOCK ══════════════════════════════════════════ -->
+    <nav id="bottom-hud-dock">
+      <!-- Dynamic modules append here: Vision Écran, Caméra, Gestes -->
+      <button id="history-btn" type="button" class="hud-dock-btn" title="Voir l'historique" onclick="requestHistory()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <span>Historique</span>
+      </button>
 
-    <!-- Bouton Déclencheur du Menu Rétractable — Haut Gauche -->
-    <button id="drawer-toggle-btn" type="button" aria-label="Ouvrir le menu des fonctionnalités" title="Menu des fonctionnalités (Toutes les options)">
-      <div class="drawer-hamburger-icon">
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
-      <span class="drawer-btn-label">MENU</span>
-    </button>
-
-    <!-- Overlay d'arrière-plan pour fermer le tiroir au clic extérieur -->
-    <div id="drawer-overlay" class="drawer-overlay"></div>
-
-    <!-- ══ TIROIR LATÉRAL RÉTRACTABLE (SIDEBAR DRAWER) ════════════════════════ -->
-    <aside id="drawer-menu" class="drawer-menu">
-      <!-- Drawer Header -->
-      <div class="drawer-header">
-        <div class="drawer-brand">
-          <div class="drawer-logo-icon">⚡</div>
-          <div class="drawer-title-wrap">
-            <div class="drawer-title" id="drawer-brand-title">VISION <span class="drawer-version">v2.0</span></div>
-            <div class="drawer-subtitle" id="drawer-brand-sub">Centre de Contrôle IA</div>
-          </div>
-        </div>
-        <button id="drawer-close-btn" class="drawer-close-btn" type="button" title="Fermer le menu" aria-label="Fermer">✕</button>
-      </div>
-
-      <!-- Drawer Content Scrollable -->
-      <div class="drawer-body">
-
-        <!-- Section 1 : Assistant & Profil -->
-        <div class="drawer-section">
-          <div class="drawer-section-title">🤖 ASSISTANT ACTIF</div>
-          <button id="drawer-btn-profile" class="drawer-card-btn highlight-card" type="button">
-            <div class="drawer-card-icon">⇄</div>
-            <div class="drawer-card-content">
-              <div class="drawer-card-label" id="drawer-active-profile-label">Changer d'Assistant</div>
-              <div class="drawer-card-sub">Basculer entre VISION et ADJOUA</div>
-            </div>
-          </button>
-        </div>
-
-        <!-- Section 2 : Commandes Vocales & Texte -->
-        <div class="drawer-section">
-          <div class="drawer-section-title">🎙️ VOIX & DIALOGUE</div>
-          <div class="drawer-grid">
-            <button id="drawer-btn-mute" class="drawer-item-btn" type="button">
-              <span class="drawer-icon">🎙️</span>
-              <span class="drawer-text">Microphone</span>
-              <span id="drawer-mute-status" class="drawer-status-badge badge-success">Actif</span>
-            </button>
-
-            <button id="drawer-btn-text" class="drawer-item-btn" type="button">
-              <span class="drawer-icon">💬</span>
-              <span class="drawer-text">Écrire Message</span>
-              <span class="drawer-arrow">➔</span>
-            </button>
-
-            <button id="drawer-btn-history" class="drawer-item-btn" type="button">
-              <span class="drawer-icon">📜</span>
-              <span class="drawer-text">Historique</span>
-              <span class="drawer-arrow">➔</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Section 3 : Media & Radio -->
-        <div class="drawer-section">
-          <div class="drawer-section-title">🎵 MULTIMÉDIA & DIVERTISSEMENT</div>
-          <div class="drawer-grid">
-            <button id="drawer-btn-radio" class="drawer-item-btn" type="button">
-              <span class="drawer-icon">📻</span>
-              <span class="drawer-text">Radio FM & Web 3D</span>
-              <span class="drawer-arrow">➔</span>
-            </button>
-
-            <button id="drawer-btn-wallpaper" class="drawer-item-btn" type="button">
-              <span class="drawer-icon">🎨</span>
-              <span class="drawer-text">Fonds d'écran</span>
-              <span class="drawer-arrow">➔</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Section 4 : Vision & Capteurs IA -->
-        <div class="drawer-section">
-          <div class="drawer-section-title">👁️ PERCEPTION & CAPTEURS IA</div>
-          <div class="drawer-grid">
-            <button id="drawer-btn-vision" class="drawer-item-btn" type="button">
-              <span class="drawer-icon">🖥️</span>
-              <span class="drawer-text">Vision Écran</span>
-              <span class="drawer-status-badge">Inactif</span>
-            </button>
-
-            <button id="drawer-btn-webcam" class="drawer-item-btn" type="button">
-              <span class="drawer-icon">📷</span>
-              <span class="drawer-text">WebCam Live</span>
-              <span class="drawer-status-badge">Inactif</span>
-            </button>
-
-            <button id="drawer-btn-gesture" class="drawer-item-btn" type="button">
-              <span class="drawer-icon">🖐️</span>
-              <span class="drawer-text">Contrôle Gestuel</span>
-              <span class="drawer-status-badge">Inactif</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Section 5 : Statut Système -->
-        <div class="drawer-section">
-          <div class="drawer-section-title">⚙️ SYSTÈME</div>
-          <div class="drawer-info-card">
-            <div class="drawer-info-row">
-              <span>Serveur Backend</span>
-              <span class="drawer-status-pill online">🟢 Opérationnel</span>
-            </div>
-            <div class="drawer-info-row">
-              <span>Synthèse Vocale</span>
-              <span class="drawer-status-pill elevenlabs">✦ ElevenLabs HD</span>
-            </div>
-            <div class="drawer-info-row">
-              <span>Modèles IA</span>
-              <span>Gemini · Groq · Grok</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Drawer Footer -->
-      <div class="drawer-footer">
-        <span>Press <kbd>ESC</kbd> pour fermer</span>
-        <span>Syndou IA © 2026</span>
-      </div>
-    </aside>
+      <button id="text-toggle-button" type="button" class="hud-dock-btn" aria-label="Ouvrir la zone de texte" title="Écrire un message">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>
+        </svg>
+        <span>Écrire</span>
+      </button>
+    </nav>
 
     <!-- Text input panel -->
     <div id="text-panel" class="text-panel-hidden">
@@ -172,110 +80,6 @@
       <div id="response-user" class="response-user"></div>
       <div id="response-text" class="response-vision"></div>
     </div>
-
-    <!-- ══ EMBEDDED MUSIC PLAYER HUD ════════════════════════════════════════ -->
-    <div id="music-player-hud" class="music-player-hidden">
-      <div class="music-player-header">
-        <div class="music-player-badge">
-          <span class="music-eq-bar b1"></span>
-          <span class="music-eq-bar b2"></span>
-          <span class="music-eq-bar b3"></span>
-          <span class="music-eq-bar b4"></span>
-          <span class="music-player-status">AUDIO EN COURS</span>
-        </div>
-        <div class="music-player-controls">
-          <button id="music-collapse-btn" type="button" title="Réduire / Agrandir" aria-label="Réduire">_</button>
-          <button id="music-close-btn" type="button" title="Fermer la musique" aria-label="Fermer">✕</button>
-        </div>
-      </div>
-      <div class="music-player-track">
-        <span class="music-icon">🎵</span>
-        <div id="music-track-title" class="music-track-title">Titre du morceau</div>
-      </div>
-      <div class="music-player-body" id="music-player-body">
-        <iframe
-          id="music-iframe"
-          src=""
-          title="VISION Music Player"
-          allow="autoplay; encrypted-media; picture-in-picture"
-          allowfullscreen
-        ></iframe>
-      </div>
-    </div>
-
-    <!-- Error / info toast -->
-    <div id="error-text"></div>
-
-    <!-- ══ PROFILE SELECTOR SCREEN ══════════════════════════════════════════ -->
-    <div id="profile-screen">
-      <div id="profile-container">
-        <div id="profile-title">
-          <span>CHOISISSEZ VOTRE</span>
-          <span id="profile-title-accent">ASSISTANT</span>
-        </div>
-        <div id="profile-subtitle">Sélectionnez l'IA avec qui vous souhaitez interagir</div>
-
-        <div id="profile-cards">
-          <!-- VISION -->
-          <div class="profile-card" id="card-vision" data-profile="vision">
-            <div class="profile-card-orb orb-vision">
-              <div class="orb-ring r1"></div>
-              <div class="orb-ring r2"></div>
-              <div class="orb-core-css"></div>
-            </div>
-            <div class="profile-card-name">V.I.S.I.O.N</div>
-            <div class="profile-card-sub">Intelligence Artificielle Généraliste</div>
-            <ul class="profile-card-traits">
-              <li>🏠 Domotique &amp; Smart Home</li>
-              <li>🧠 Multi-LLM (Gemini · Grok · Groq)</li>
-              <li>💼 Productivité &amp; Data Science</li>
-              <li>🗣️ Voix masculine — Élégant &amp; Sarcastique</li>
-            </ul>
-            <button class="profile-select-btn btn-vision" onclick="selectProfile('vision')">
-              Activer VISION
-            </button>
-          </div>
-
-          <!-- ADJOUA -->
-          <div class="profile-card profile-card-featured" id="card-adjoua" data-profile="adjoua">
-            <div class="profile-featured-badge">✦ NOUVEAU</div>
-            <div class="profile-card-orb orb-adjoua">
-              <div class="orb-ring r1"></div>
-              <div class="orb-ring r2"></div>
-              <div class="orb-core-css"></div>
-            </div>
-            <div class="profile-card-name">ADJOUA</div>
-            <div class="profile-card-sub">DJ &amp; Animatrice Musicale Ivoirienne</div>
-            <ul class="profile-card-traits">
-              <li>🎵 Musique Afro · Coupé-Décalé · Afrobeats</li>
-              <li>💃 Ambiance &amp; Recommandations musicales</li>
-              <li>🌍 Culture Ivoirienne &amp; Nouchi</li>
-              <li>🌸 Voix féminine douce — Vibe Abidjan</li>
-            </ul>
-            <button class="profile-select-btn btn-adjoua" onclick="selectProfile('adjoua')">
-              Activer ADJOUA
-            </button>
-          </div>
-        </div>
-
-        <div id="profile-footer">Syndou — Assistant IA Personnel v2.0</div>
-      </div>
-    </div>
-
-    <!-- Bouton changement de profil -->
-    <button id="switch-profile-btn" type="button" title="Changer d'assistant" onclick="showProfileScreen()">⇄</button>
-
-    <!-- Bouton historique -->
-    <button id="history-btn" type="button" title="Voir l'historique" onclick="requestHistory()">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
-      </svg>
-    </button>
-
-    <!-- Bouton Radio -->
-    <button id="radio-launcher-btn" type="button" title="Ouvrir la Radio FM / Web">
-      📻 RADIO
-    </button>
 
     <!-- ══ MODAL RADIO 3D INTERACTIF ══════════════════════════════════════════ -->
     <div id="radio-modal" class="radio-hidden">
@@ -384,6 +188,95 @@
         </div>
 
         <div id="radio-toast" class="radio-toast"></div>
+      </div>
+    </div>
+
+    <!-- ══ EMBEDDED MUSIC PLAYER HUD ════════════════════════════════════════ -->
+    <div id="music-player-hud" class="music-player-hidden">
+      <div class="music-player-header">
+        <div class="music-player-badge">
+          <span class="music-eq-bar b1"></span>
+          <span class="music-eq-bar b2"></span>
+          <span class="music-eq-bar b3"></span>
+          <span class="music-eq-bar b4"></span>
+          <span class="music-player-status">AUDIO EN COURS</span>
+        </div>
+        <div class="music-player-controls">
+          <button id="music-collapse-btn" type="button" title="Réduire / Agrandir" aria-label="Réduire">_</button>
+          <button id="music-close-btn" type="button" title="Fermer la musique" aria-label="Fermer">✕</button>
+        </div>
+      </div>
+      <div class="music-player-track">
+        <span class="music-icon">🎵</span>
+        <div id="music-track-title" class="music-track-title">Titre du morceau</div>
+      </div>
+      <div class="music-player-body" id="music-player-body">
+        <iframe
+          id="music-iframe"
+          src=""
+          title="VISION Music Player"
+          allow="autoplay; encrypted-media; picture-in-picture"
+          allowfullscreen
+        ></iframe>
+      </div>
+    </div>
+
+    <!-- Error / info toast -->
+    <div id="error-text"></div>
+
+    <!-- ══ PROFILE SELECTOR SCREEN ══════════════════════════════════════════ -->
+    <div id="profile-screen">
+      <div id="profile-container">
+        <div id="profile-title">
+          <span>CHOISISSEZ VOTRE</span>
+          <span id="profile-title-accent">ASSISTANT</span>
+        </div>
+        <div id="profile-subtitle">Sélectionnez l'IA avec qui vous souhaitez interagir</div>
+
+        <div id="profile-cards">
+          <!-- VISION -->
+          <div class="profile-card" id="card-vision" data-profile="vision">
+            <div class="profile-card-orb orb-vision">
+              <div class="orb-ring r1"></div>
+              <div class="orb-ring r2"></div>
+              <div class="orb-core-css"></div>
+            </div>
+            <div class="profile-card-name">V.I.S.I.O.N</div>
+            <div class="profile-card-sub">Intelligence Artificielle Généraliste</div>
+            <ul class="profile-card-traits">
+              <li>🏠 Domotique &amp; Smart Home</li>
+              <li>🧠 Multi-LLM (Gemini · Grok · Groq)</li>
+              <li>💼 Productivité &amp; Data Science</li>
+              <li>🗣️ Voix masculine — Élégant &amp; Sarcastique</li>
+            </ul>
+            <button class="profile-select-btn btn-vision" onclick="selectProfile('vision')">
+              Activer VISION
+            </button>
+          </div>
+
+          <!-- ADJOUA -->
+          <div class="profile-card profile-card-featured" id="card-adjoua" data-profile="adjoua">
+            <div class="profile-featured-badge">✦ NOUVEAU</div>
+            <div class="profile-card-orb orb-adjoua">
+              <div class="orb-ring r1"></div>
+              <div class="orb-ring r2"></div>
+              <div class="orb-core-css"></div>
+            </div>
+            <div class="profile-card-name">ADJOUA</div>
+            <div class="profile-card-sub">DJ &amp; Animatrice Musicale Ivoirienne</div>
+            <ul class="profile-card-traits">
+              <li>🎵 Musique Afro · Coupé-Décalé · Afrobeats</li>
+              <li>💃 Ambiance &amp; Recommandations musicales</li>
+              <li>🌍 Culture Ivoirienne &amp; Nouchi</li>
+              <li>🌸 Voix féminine douce — Vibe Abidjan</li>
+            </ul>
+            <button class="profile-select-btn btn-adjoua" onclick="selectProfile('adjoua')">
+              Activer ADJOUA
+            </button>
+          </div>
+        </div>
+
+        <div id="profile-footer">Syndou — Assistant IA Personnel v2.0</div>
       </div>
     </div>
 

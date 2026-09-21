@@ -15,7 +15,6 @@ import { showCarte, hideCarte } from "./carte3d";
 import { initWallpaperSystem } from "./wallpaper";
 import { vision3D } from "./vision3d_interactions";
 import { initRadioModule, openRadioModal, closeRadioModal, playStationByName } from "./radio";
-import { initDrawer } from "./drawer";
 import "./style.css";
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -464,8 +463,37 @@ textInputEl.addEventListener("keydown", (e: KeyboardEvent) => {
   }
 });
 
-function initActiveProfile(profileName: "vision" | "adjoua"): void {
-  activeProfile = profileName;
+// ── Boot ──────────────────────────────────────────────────────────────────────
+setConnected(false);
+applyState("idle");
+setMuted(false);
+injectVisionButton();
+injectWebcamButton();
+injectGestureButton((data) => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(data));
+  }
+});
+initWallpaperSystem();
+initRadioModule();
+
+const radioLauncherBtn = document.getElementById("radio-launcher-btn");
+if (radioLauncherBtn) {
+  radioLauncherBtn.addEventListener("click", () => {
+    openRadioModal();
+  });
+}
+
+vision3D.init((data: any) => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(data));
+  }
+});
+
+// Listen for profile selection (from the profile screen HTML/JS)
+window.addEventListener("profileSelected", (e: Event) => {
+  const evt = e as CustomEvent<{ profile: string }>;
+  activeProfile = evt.detail.profile as "vision" | "adjoua";
 
   // Create the orb with the right palette
   const palette: OrbPalette = activeProfile === "adjoua" ? PALETTE_ADJOUA : PALETTE_VISION;
@@ -476,20 +504,8 @@ function initActiveProfile(profileName: "vision" | "adjoua"): void {
   const label = document.getElementById("assistant-label");
   if (label) label.textContent = activeProfile === "adjoua" ? "ADJOUA" : "VISION";
 
-  const drawerBrandTitle = document.getElementById("drawer-brand-title");
-  if (drawerBrandTitle) {
-    drawerBrandTitle.innerHTML = activeProfile === "adjoua" ? 'ADJOUA <span class="drawer-version">v2.0</span>' : 'VISION <span class="drawer-version">v2.0</span>';
-  }
-
-  const drawerActiveProfileLabel = document.getElementById("drawer-active-profile-label");
-  if (drawerActiveProfileLabel) {
-    drawerActiveProfileLabel.textContent = activeProfile === "adjoua" ? "Assistant : ADJOUA (Musique & Ambiance)" : "Assistant : VISION (Généraliste & Code)";
-  }
-
-  // Start WebSocket (connect to backend) if not already connected
-  if (!ws || ws.readyState === WebSocket.CLOSED) {
-    connect();
-  }
+  // Start WebSocket (connect to backend)
+  connect();
 
   // Notify backend of profile choice once connected
   setTimeout(() => {
@@ -497,59 +513,6 @@ function initActiveProfile(profileName: "vision" | "adjoua"): void {
       ws.send(JSON.stringify({ type: "set_profile", profile: activeProfile }));
     }
   }, 800);
-}
-
-// ── Boot ──────────────────────────────────────────────────────────────────────
-try {
-  // 1. Initialize active profile & 3D Orb IMMEDIATELY (Core First)
-  const savedProfile = (localStorage.getItem("vision_profile") as "vision" | "adjoua") || "vision";
-  initActiveProfile(savedProfile);
-} catch (err) {
-  console.error("[VISION] Erreur d'initialisation de l'Orbe 3D:", err);
-}
-
-try { setConnected(false); } catch (e) {}
-try { applyState("idle"); } catch (e) {}
-try { setMuted(false); } catch (e) {}
-try { initDrawer(); } catch (e) { console.warn("[VISION] Init drawer warn:", e); }
-try { injectVisionButton(); } catch (e) {}
-try { injectWebcamButton(); } catch (e) {}
-try {
-  injectGestureButton((data) => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(data));
-    }
-  });
-} catch (e) {
-  console.warn("[VISION] Init gesture warn:", e);
-}
-try { initWallpaperSystem(); } catch (e) { console.warn("[VISION] Init wallpaper warn:", e); }
-try { initRadioModule(); } catch (e) { console.warn("[VISION] Init radio warn:", e); }
-
-try {
-  const radioLauncherBtn = document.getElementById("radio-launcher-btn");
-  if (radioLauncherBtn) {
-    radioLauncherBtn.addEventListener("click", () => {
-      openRadioModal();
-    });
-  }
-} catch (e) {}
-
-try {
-  vision3D.init((data: any) => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(data));
-    }
-  });
-} catch (e) {
-  console.warn("[VISION] Init vision3D warn:", e);
-}
-
-// Listen for profile selection (from the profile screen HTML/JS)
-window.addEventListener("profileSelected", (e: Event) => {
-  const evt = e as CustomEvent<{ profile: string }>;
-  const p = (evt.detail?.profile as "vision" | "adjoua") || "vision";
-  initActiveProfile(p);
 });
 
 // Escape ferme la carte et la radio
