@@ -7,7 +7,9 @@ import os
 import json
 import time
 import asyncio
+import requests
 from modules import state
+from modules.config import OLLAMA_URL, OLLAMA_MODELS
 
 MEMOIRE_FILE = "vision_memoire.json"
 
@@ -112,21 +114,21 @@ def construire_contexte_memoire():
 async def enregistrer_resume_session_actuelle():
     """Génère un résumé de la session de conversation en cours et l'enregistre en mémoire."""
     from modules.config import gemini_client, MODELS_LIST
-    
+
     if not state.session_messages:
         return
-        
+
     messages_copy = list(state.session_messages)
     # Réinitialiser la liste pour la session suivante
     state.session_messages = []
-    
+
     # Formater les messages pour le prompt de résumé
     conv_text = ""
     for msg in messages_copy:
         role = "Syndou" if msg.role == "user" else "VISION"
         text = msg.parts[0].text if msg.parts else ""
         conv_text += f"{role}: {text}\n"
-        
+
     prompt = (
         "Voici la conversation qui vient d'avoir lieu entre Syndou et son assistant vocal VISION.\n"
         "Rédige un résumé ultra-court (maximum une phrase de 10 à 15 mots) décrivant ce dont ils ont parlé "
@@ -134,25 +136,77 @@ async def enregistrer_resume_session_actuelle():
         "Sois direct et n'utilise pas de caractères spéciaux comme les boutons Markdown ou les hashtags.\n\n"
         f"CONVERSATION :\n{conv_text}"
     )
-    
+
+    resume = None
+
+    # 1. Tentative avec les modèles LOCAUX (Ollama)
     try:
-        model = MODELS_LIST[0]
-        response = await asyncio.to_thread(
-            gemini_client.models.generate_content,
-            model=model,
-            contents=prompt
-        )
-        resume = response.text.replace("\n", "").strip()
-        if resume:
-            memoire = charger_memoire()
-            memoire["sessions"].append({
-                "timestamp": time.strftime("%d/%m/%Y %H:%M"),
-                "resume": resume
-            })
-            # Conserver uniquement les 20 plus récentes
-            if len(memoire["sessions"]) > 20:
-                memoire["sessions"] = memoire["sessions"][-20:]
-            sauvegarder_memoire(memoire)
-            print(f"[MEMOIRE] Résumé de session enregistré : {resume}")
+        for model_local in OLLAMA_MODELS:
+            try:
+                print(f"[MEMOIRE] Tentative de résumé avec modèle local : {model_local}")
+                resp = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        requests.post,
+                        f"{OLLAMA_URL}/api/chat",
+                        json={"model": model_local, "messages": [
+                            {"role": "system", "content": "Tu es un assistant qui résume des conversations de manière ultra-concise."},
+                            {"role": "user", "content": prompt}
+                        ], "stream": False},
+                        timeout=20
+                    ),
+                    timeout=25.0
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    resume = data.get("message", {}).get("content", "").replace("\n", "").strip()
+                    if resume:
+                        print(f"[MEMOIRE] Résumé généré localement par {model_local}")
+                        break
+            except Exception as e:
+                print(f"[MEMOIRE] Echec modèle local {model_local} : {e}")
+                continue
     except Exception as e:
-        print(f"[MEMOIRE] Erreur lors de la génération du résumé de session : {e}")
+        print(f"[MEMOIRE] Erreur générale Ollama : {e}")
+
+    # 2. Fallback sur Gemini si le local a échoué
+    if not resume:
+        print("[MEMOIRE] Aucun modèle local disponible, basculement sur Gemini...")
+        for model_gemini in MODELS_LIST:
+            try:
+                for attempt in range(3):
+                    try:
+                        response = await asyncio.to_thread(
+                            gemini_client.models.generate_content,
+                            model=model_gemini,
+                            contents=prompt
+                        )
+                        resume = response.text.replace("\n", "").strip()
+                        if resume:
+                            break
+                    except Exception as e:
+                        if "429" in str(e):
+                            wait_time = (attempt + 1) * 2
+                            print(f"[MEMOIRE] Quota atteint pour {model_gemini}, attente de {wait_time}s...")
+                            await asyncio.sleep(wait_time)
+                        else:
+                            raise e
+                if resume:
+                    break
+            except Exception as e:
+                print(f"[MEMOIRE] Erreur avec le modèle Gemini {model_gemini} : {e}")
+
+    if not resume:
+        resume = "Session terminée (résumé IA indisponible)."
+
+    try:
+        memoire = charger_memoire()
+        memoire["sessions"].append({
+            "timestamp": time.strftime("%d/%m/%Y %H:%M"),
+            "resume": resume
+        })
+        if len(memoire["sessions"]) > 20:
+            memoire["sessions"] = memoire["sessions"][-20:]
+        sauvegarder_memoire(memoire)
+        print(f"[MEMOIRE] Résumé de session enregistré : {resume}")
+    except Exception as e:
+        print(f"[MEMOIRE] Erreur lors de la sauvegarde du résumé : {e}")

@@ -139,6 +139,19 @@ async def send_web_youtube(video_id: str, title: str = ""):
         )
 
 
+async def send_web_radio(action: str = "open_radio", station: str = ""):
+    """Ouvre, ferme ou lance une station radio sur le frontend."""
+    if state.CONNECTED_CLIENTS:
+        message = json.dumps({
+            "action": action,
+            "station": station
+        })
+        await asyncio.gather(
+            *[ws.send(message) for ws in state.CONNECTED_CLIENTS],
+            return_exceptions=True
+        )
+
+
 async def stop_web_youtube():
     """Arrête la lecture de la musique dans l'interface web."""
     if state.CONNECTED_CLIENTS:

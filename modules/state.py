@@ -32,6 +32,8 @@ tts_volume = 1.0     # Volume de lecture (0.0 à 1.0)
 MODE_IRON_MAN = False
 MODE_GARDE    = False
 MODE_ANALYSE  = False
+MODE_SENTINELLE = False
+MODE_LECTEUR  = False
 VIDEO_LANCEE  = False
 PROFIL_ACTIF  = "vision"  # "vision" | "adjoua"
 

@@ -39,6 +39,11 @@
       "valeur": "Côte d'Ivoire",
       "timestamp": "08/09/2026 11:27",
       "categorie": "general"
+    },
+    "localisation_actuelle": {
+      "valeur": "Côte d'Ivoire",
+      "timestamp": "16/09/2026 10:28",
+      "categorie": "general"
     }
   },
   "sessions": [
@@ -105,6 +110,14 @@
     {
       "timestamp": "08/09/2026 14:22",
       "resume": "Syndou a demandé à VISION d'appeler Maman Ora sur WhatsApp."
+    },
+    {
+      "timestamp": "15/09/2026 16:01",
+      "resume": "Discussion sur l'allumage de la radio et le lancement final de la station RTL."
+    },
+    {
+      "timestamp": "16/09/2026 11:59",
+      "resume": "Lancement de la création d'un site web pour une marque de vêtements."
     }
   ]
 }

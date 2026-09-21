@@ -379,6 +379,8 @@ def run_scheduler():
 def start_ia():
     threading.Thread(target=monitor_claps, daemon=True).start()
     threading.Thread(target=monitor_garde, daemon=True).start()
+    from modules.sentinelle import start_sentinelle
+    threading.Thread(target=start_sentinelle, daemon=True).start()
     threading.Thread(target=run_scheduler, daemon=True).start()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

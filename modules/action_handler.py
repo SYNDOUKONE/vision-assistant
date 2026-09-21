@@ -78,6 +78,9 @@ def executer_action_pc(commande):
     cmd = commande.lower()
     user_profile = os.environ.get('USERPROFILE', '')
 
+    if "radio" in cmd:
+        return None
+
     if "met de la musique" in cmd or "mets de la musique" in cmd:
         url = "https://www.youtube.com/watch?v=7CGKeID7nRc&list=PL4fGSI1pDJn50iCQRUVmgUjOrCggCQ9nR"
         ouvrir_navigateur(url)
@@ -210,8 +213,28 @@ async def traiter_commande_entiere(texte_utilisateur, mobile_ws=None):
         reponse = resoudre_francais_localement(texte_utilisateur)
     if not reponse:
         reponse = resoudre_conversion_localement(texte_utilisateur)
-    if not reponse:
-        reponse = resoudre_traduction_localement(texte_utilisateur)
+    # Interception rapide des commandes Radio
+    t_lower = texte_utilisateur.lower()
+    if "radio" in t_lower:
+        from modules.websocket_server import send_web_radio
+        if any(kw in t_lower for kw in ["ferme", "stop", "arrête", "quitte"]):
+            await send_web_radio("close_radio")
+            reponse_txt = "J'ai fermé la radio Syndou."
+            await parler(reponse_txt)
+            await send_web_text(texte_utilisateur, reponse_txt)
+            return
+        elif any(kw in t_lower for kw in ["ouvre", "lance", "affiche", "mets", "écouter", "écoute"]):
+            station = ""
+            for s_name in ["rtl", "kiis", "europe 1", "rmc", "trace", "nostalgie", "jam", "rfi", "bbc", "al-bayane", "albayane", "senegal", "hot 97", "kexp"]:
+                if s_name in t_lower:
+                    station = s_name
+                    break
+            await send_web_radio("play_radio" if station else "open_radio", station)
+            msg_station = f"station {station.upper()}" if station else "3D"
+            reponse_txt = f"Je lance la radio {msg_station} pour vous Syndou."
+            await parler(reponse_txt)
+            await send_web_text(texte_utilisateur, reponse_txt)
+            return
 
     # Vision écran
     if not reponse:
@@ -276,17 +299,24 @@ async def traiter_commande_entiere(texte_utilisateur, mobile_ws=None):
                 msg = desactiver_reconnaissance_gestes()
                 await parler(msg)
 
-            elif action == "get_budget":
-                from modules.budget import obtenir_resume_budget
-                msg = obtenir_resume_budget()
-                await parler(msg)
+            elif action in ["open_radio", "play_radio"]:
+                from modules.websocket_server import send_web_radio
+                station = data.get("station", "")
+                await send_web_radio("play_radio" if station else "open_radio", station)
+                msg_txt = f"Radio {station.upper()} lancée !" if station else "Radio 3D ouverte pour vous Syndou."
+                await parler(msg_txt)
+
+            elif action == "close_radio":
+                from modules.websocket_server import send_web_radio
+                await send_web_radio("close_radio")
+                await parler("Radio fermée Syndou.")
 
             # ── MODES ────────────────────────────────────────────────────
             elif action == "mode_iron_man":
 
                 etat = data.get("etat", "off")
                 state.MODE_IRON_MAN = (etat == "on")
-                msg = "Mode Iron Man activé, Monsieur. Je reste à l'écoute de vos signaux." if state.MODE_IRON_MAN else "Mode Iron Man désactivé. Je repasse en veille domotique."
+                msg = "Protocoles Iron Man activés, Monsieur. Je reste à l'écoute de vos signaux d'urgence." if state.MODE_IRON_MAN else "Protocoles Iron Man désactivés. Je repasse en veille standard, Monsieur."
                 await parler(msg)
 
             elif action == "mode_analyse":
@@ -304,11 +334,39 @@ async def traiter_commande_entiere(texte_utilisateur, mobile_ws=None):
                 etat = data.get("etat", "off")
                 if etat == "on":
                     state.MODE_GARDE = True
-                    msg = "Mode Garde activé, Monsieur. Je lance la surveillance visuelle."
+                    msg = "Mode Garde activé, Monsieur. Les systèmes de surveillance visuelle sont en ligne."
                 else:
                     state.MODE_GARDE = False
-                    msg = "Mode Garde désactivé. Fin de la surveillance."
+                    msg = "Mode Garde désactivé. Fin de la surveillance, Monsieur."
                 await parler(msg)
+
+            elif action == "mode_sentinelle":
+                etat = data.get("etat", "off")
+                if etat == "on":
+                    state.MODE_SENTINELLE = True
+                    msg = "Mode Sentinelle Cyber activé, Monsieur. Déploiement des protocoles de surveillance réseau et système. Votre pare-feu numérique est en ligne."
+                else:
+                    state.MODE_SENTINELLE = False
+                    msg = "Mode Sentinelle Cyber désactivé, Monsieur. Les boucliers de surveillance sont en veille."
+                await parler(msg)
+
+            elif action == "mode_lecteur":
+                etat = data.get("etat", "off")
+                if etat == "on":
+                    state.MODE_LECTEUR = True
+                    msg = "Mode Lecteur activé, Monsieur. Je vais me concentrer sur la lecture et la synthèse de longs textes, sans interruption."
+                else:
+                    state.MODE_LECTEUR = False
+                    msg = "Mode Lecteur désactivé."
+                await parler(msg)
+
+            elif action == "lire_document":
+                fichier = data.get("fichier", "")
+                if fichier:
+                    from modules.lecteur import demarrer_lecture
+                    demarrer_lecture(fichier)
+                else:
+                    await parler("Veuillez préciser le nom du fichier à lire, Monsieur.")
 
             # ── MÉMOIRE ──────────────────────────────────────────────────
             elif action == "memoriser":

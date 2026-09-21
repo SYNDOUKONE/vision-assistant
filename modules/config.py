@@ -39,6 +39,7 @@ NEWS_API_KEY          = os.getenv("NEWS_API_KEY")
 DEEPL_API_KEY         = os.getenv("DEEPL_API_KEY")
 HUGGINGFACE_API_KEY   = os.getenv("HUGGINGFACE_API_KEY")
 AIMUSIC_API_KEY       = os.getenv("AIMUSIC_API_KEY")
+EXPLABS_API_KEY       = os.getenv("EXPLABS_API_KEY")
 
 # Spotify
 SPOTIPY_CLIENT_ID     = os.getenv("SPOTIPY_CLIENT_ID")
@@ -64,6 +65,10 @@ if OPENAI_API_KEY and OPENAI_API_KEY != "VOTRE_CLE_ICI":
 groq_client = None
 if GROQ_API_KEY:
     groq_client = OpenAI(api_key=GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
+
+explabs_client = None
+if EXPLABS_API_KEY:
+    explabs_client = OpenAI(api_key=EXPLABS_API_KEY, base_url="https://api.experientiallabs.ai/v1")
 
 # Spotify
 import spotipy

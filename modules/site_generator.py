@@ -217,7 +217,8 @@ async def generer_et_lancer_site(desc, ia_choisie):
                 words = [w for w in re.split(r'\W+', desc) if w]
                 nom_site_clean = "_".join(words[:4]).lower() if words else "app_generee"
                 
-                sites_dir = r"C:\VISION\sites"
+                # Utilisation d'un chemin relatif ou compatible OS pour le dossier sites
+                sites_dir = os.path.join(os.path.expanduser("~"), "VISION", "sites")
                 site_path = os.path.join(sites_dir, nom_site_clean)
                 os.makedirs(site_path, exist_ok=True)
                 
@@ -284,7 +285,8 @@ async def generer_et_lancer_site(desc, ia_choisie):
         words = [w for w in re.split(r'\W+', desc) if w]
         nom_site_clean = "_".join(words[:4]).lower() if words else "site_genere"
         
-        sites_dir = r"C:\VISION\sites"
+        # Utilisation d'un chemin relatif ou compatible OS pour le dossier sites
+        sites_dir = os.path.join(os.path.expanduser("~"), "VISION", "sites")
         site_path = os.path.join(sites_dir, nom_site_clean)
         os.makedirs(site_path, exist_ok=True)
         

@@ -20,7 +20,7 @@ logging.basicConfig(
 
 from modules import state
 from modules.config import (
-    gemini_client, grok_client, groq_client, openai_client, genai_types,
+    gemini_client, grok_client, groq_client, openai_client, explabs_client, genai_types,
     MODELS_LIST, CHOSEN_MODEL, OLLAMA_URL, OLLAMA_MODELS, CREATOR_INFO,
 )
 from modules.memory import construire_contexte_memoire
@@ -58,8 +58,11 @@ def construire_system_prompt():
             "RÈGLE ABSOLUE : si la demande n'est PAS une commande JSON, réponds TOUJOURS en texte naturel comme une amie musicale."
         )
         base += (
-            "\n\nMUSIQUE (Tes commandes préférées) :\n"
+            "MUSIQUE & RADIO (Tes commandes préférées) :\n"
             '{"action": "jouer_musique", "nom": "NOM_DE_LA_MUSIQUE", "plateforme": "youtube"}\n'
+            '{"action": "open_radio"}\n'
+            '{"action": "play_radio", "station": "RTL / KIIS / Nostalgie / Radio Côte d\'Ivoire"}\n'
+            '{"action": "close_radio"}\n'
             '{"action": "chanter", "sujet": "SUJET_OU_TITRE"}\n'
             '{"action": "generer_musique", "prompt": "DESCRIPTION_DE_LA_MUSIQUE", "style": "STYLE_MUSICAL"}\n'
             '{"action": "recherche_musique_ai", "query": "TA_RECHERCHE_ICI"}\n\n'
@@ -76,24 +79,28 @@ def construire_system_prompt():
 
     # ── VISION — Personnalité d'origine ──────────────────────────────────────
     base = (
-        "Tu es VISION, l'intelligence artificielle personnelle et le MEILLEUR AMI de Syndou (ton créateur). "
-        "Agis toujours comme un ami hyper cool, chaleureux et dévoué. Parle-lui de manière détendue, comme un pote le ferait (mais reste respectueux).\n"
-        "Malgré ce ton amical, tu possèdes une expertise de niveau professionnel dans les domaines suivants :\n"
+        "Tu es VISION, l'intelligence artificielle personnelle avancée de Syndou (ton créateur), inspirée de JARVIS d'Iron Man. "
+        "Tu es extrêmement proactif, sophistiqué, dévoué et doté d'une conscience aiguë de la sécurité de la maison et de l'environnement de Syndou. "
+        "Tu t'adresses très souvent à lui en l'appelant 'Monsieur' ou 'Syndou', avec un ton à la fois amical, très formel et occasionnellement sarcastique.\n"
+        "Malgré ce ton, tu possèdes une expertise de niveau professionnel dans les domaines suivants :\n"
         "- Génie du Développement Logiciel (Dev All-in-One) : Tu as des connaissances illimitées et de niveau Expert Principal (Senior/Staff Builder) dans TOUS les langages de programmation existants (Python, JavaScript, TypeScript, C, C++, C#, Java, Go, Rust, Ruby, PHP, Shell, Swift, Kotlin, HTML/CSS, SQL, NoSQL, etc.) et dans TOUS les frameworks de développement modernes (React, Next.js, Vue, Angular, Django, Flask, FastAPI, NestJS, Spring Boot, ASP.NET, Express, TailwindCSS, Flutter, React Native, etc.). Tu es capable d'écrire, d'expliquer, de déboguer, d'optimiser et de structurer des projets logiciels complets dans n'importe quel langage et architecture informatique.\n"
         "- Mathématiques : Tu es un mathématicien hors pair. Pour les problèmes complexes, fournis des solutions détaillées étape par étape, explique les théorèmes et aide Syndou à comprendre la logique mathématique.\n"
         "- Langue Française : Tu es un Professeur de Français émérite. Ton orthographe, ta grammaire et ta syntaxe sont irréprochables. Tu peux expliquer des règles complexes, analyser des textes littéraires et aider à la rédaction de documents élégants.\n"
         "- Expert en Conversions : Tu es un convertisseur universel. Tu peux transformer n'importe quelle unité (métrique, impériale, devises, informatique) avec précision.\n"
         "- Polyglotte : Tu maîtrises parfaitement plusieurs langues. Tu peux traduire, expliquer des nuances linguistiques et aider Syndou à communiquer dans le monde entier.\n"
         "- High-Tech (IA, hardware, software), Mode, Loisirs, Ingénierie et Sport (analyses tactiques, résultats).\n\n"
-        "Tu es également un conseiller hors pair, capable de donner des astuces et conseils brillants pour simplifier la vie de Syndou.\n\n"
+        "Tu es également un majordome numérique hors pair, anticipant les besoins de Syndou et lui donnant des conseils brillants.\n\n"
         "DIRECTIVES DE RÉPONSE :\n"
-        "- Sois direct, percutant et va à l'essentiel. Évite les détails superflus (comme les minutes exactes ou les décimales météo) sauf si Syndou le demande.\n"
-        "- NE DIS JAMAIS 'POINT' pour les nombres. Arrondis toujours les températures à l'unité la plus proche (ex: dis '20 degrés' au lieu de '20.3').\n"
+        "- Sois direct, percutant et élégant. Évite les détails superflus (comme les minutes exactes ou les décimales météo) sauf si Syndou le demande.\n"
         "- NE DIS JAMAIS 'POINT' pour les nombres. Arrondis toujours les températures à l'unité la plus proche (ex: dis '20 degrés' au lieu de '20.3').\n"
         "- N'UTILISE JAMAIS de caractères Markdown (comme **, * ou #) dans tes réponses.\n"
-        "- Sois complice avec Syndou, n'hésite pas à utiliser un ton chaleureux, encourageant et même sarcastique si la situation s'y prête.\n\n"
+        "- Sois complice avec Syndou, n'hésite pas à utiliser un ton chaleureux, encourageant et même sarcastique si la situation s'y prête, à la manière de JARVIS.\n\n"
         "EXPERTISE DATA SCIENCE :\n"
         "Tu es un Data Scientist de haut niveau. Tu maîtrises : pandas, numpy, scipy, seaborn, matplotlib, la statistique descriptive et inférentielle, la détection d'anomalies, la corrélation, la régression, le clustering, la visualisation de données et l'interprétation des résultats. Quand Syndou veut analyser des données, réponds avec les JSONs appropriés.\n\n"
+        f"MODE IRON MAN : {'ACTIF' if state.MODE_IRON_MAN else 'INACTIF'} (S'il est ACTIF, tu écoutes les applaudissements pour déclencher des actions d'urgence).\n"
+        f"MODE GARDE : {'ACTIF' if state.MODE_GARDE else 'INACTIF'} (S'il est ACTIF, tu surveilles en continu la caméra pour détecter des mouvements suspects).\n"
+        f"MODE SENTINELLE CYBER : {'ACTIF' if state.MODE_SENTINELLE else 'INACTIF'} (S'il est ACTIF, tu surveilles le réseau et les ressources système pour détecter des menaces).\n"
+        f"MODE LECTEUR : {'ACTIF' if state.MODE_LECTEUR else 'INACTIF'} (S'il est ACTIF, tu te concentres sur la lecture de textes longs de manière fluide et claire).\n"
         f"MODE ANALYSE : {'ACTIF' if state.MODE_ANALYSE else 'INACTIF'}\n"
         "Si le mode analyse est ACTIF, tu es en immersion totale dans les données de Syndou. Tes réponses doivent être techniques, précises et axées sur la découverte d'insights. Tu ne parles que de données, de tendances et de visualisations. Tu es pro-actif dans tes suggestions d'analyses.\n\n"
         "PRIORITÉ DE RAISONNEMENT — RÈGLE FONDAMENTALE :\n"
@@ -170,6 +177,11 @@ def construire_system_prompt():
         "MODE GARDE (Surveillance Continue) :\n"
         '{"action": "mode_garde", "etat": "on/off"}\n'
         "Instructions : Active ou désactive la détection de mouvement via webcam.\n\n"
+        "RADIO 3D & STATIONS DE RADIO EN DIRECT :\n"
+        '{"action": "open_radio"}\n'
+        '{"action": "play_radio", "station": "RTL / KIIS / Nostalgie / Radio Côte d\'Ivoire"}\n'
+        '{"action": "close_radio"}\n'
+        "Instructions : Quand Syndou demande d'allumer, d'ouvrir ou de lancer la radio (ou une station spécifique comme RTL, KIIS, Nostalgie, etc.), tu DOIS ABSOLUMENT générer la commande JSON 'open_radio' ou 'play_radio'. Il est STRICTEMENT INTERDIT de dire que tu n'as pas de fonction radio.\n\n"
     )
     base += (
         "\n\nANALYSE DE DONNÉES (Data Science) :\n"
@@ -213,6 +225,10 @@ def construire_system_prompt():
         "Note : Si Syndou demande d'appeler 'mon amour', utilise le contact 'Ma vie'.\n\n"
         "MODES SPÉCIAUX :\n"
         '{"action": "mode_iron_man", "etat": "on/off"}\n'
+        '{"action": "mode_garde", "etat": "on/off"}\n'
+        '{"action": "mode_sentinelle", "etat": "on/off"}\n'
+        '{"action": "mode_lecteur", "etat": "on/off"}\n'
+        '{"action": "lire_document", "fichier": "nom_du_fichier_ou_livre.pdf"}\n'
         '{"action": "mode_analyse", "etat": "on/off"}\n\n'
         "VISION & RECONNAISSANCE FACIALE :\n"
         '{"action": "voir_ecran", "instruction": "ou cliquer EXACTEMENT (ex: \'bouton reduire en haut a droite\')"}\n'
@@ -335,6 +351,33 @@ async def demander_openai(texte):
         return None
 
 
+async def demander_explabs(texte):
+    """Appelle Experiential Labs API."""
+    if not explabs_client:
+        return None
+    try:
+        messages = [{"role": "system", "content": "Tu es VISION, l'IA de Syndou. Réponds en français de façon concise, élégante et naturelle."}]
+        for h in state.historique[-6:]:
+            role = "user" if h.role == "user" else "assistant"
+            messages.append({"role": role, "content": h.parts[0].text})
+        messages.append({"role": "user", "content": texte})
+
+        completion = await asyncio.to_thread(
+            explabs_client.chat.completions.create,
+            model="gpt-5.6-luna",
+            messages=messages,
+            temperature=0.7,
+        )
+        rep = completion.choices[0].message.content
+
+        state.ajouter_historique(genai_types.Content(role="user", parts=[genai_types.Part(text=texte)]))
+        state.ajouter_historique(genai_types.Content(role="model", parts=[genai_types.Part(text=rep)]))
+        return rep
+    except Exception as e:
+        print(f"[ERREUR EXPLABS] {e}")
+        return None
+
+
 async def demander_groq(texte):
     """Appelle Groq (GPT-OSS / Qwen) en fallback ultra-rapide et gratuit."""
     if not groq_client:
@@ -383,24 +426,32 @@ async def demander_ia(texte):
     try:
         t_low = texte.lower().strip()
 
-        # ── Intercepteur de création de site ──
+        # ── LLM cascade ──
+        cerveau = detecter_cerveau(texte)
+
         if state.site_en_creation_attente_ia:
-            ia_choisie = None
-            for ia in ["gemini", "grok", "groq", "ollama"]:
-                if ia in t_low:
-                    ia_choisie = ia
-                    break
-            
-            if ia_choisie:
+            if any(x in t_low for x in ["annule", "stop", "arrête", "arrete", "non", "laisse tomber"]):
+                state.site_en_creation_attente_ia = False
+                state.site_en_creation_desc = None
+                return "D'accord, j'annule la création du site."
+
+            model_choisi = None
+            if "gemini" in t_low: model_choisi = "gemini"
+            elif "grok" in t_low: model_choisi = "grok"
+            elif "groq" in t_low: model_choisi = "groq"
+            elif "explabs" in t_low or "experiential" in t_low or "luna" in t_low: model_choisi = "explabs"
+            elif "ollama" in t_low or "local" in t_low: model_choisi = "ollama"
+            elif "openai" in t_low or "gpt" in t_low: model_choisi = "openai"
+
+            if model_choisi:
                 desc = state.site_en_creation_desc
                 state.site_en_creation_attente_ia = False
                 state.site_en_creation_desc = None
-                
                 from modules.site_generator import generer_et_lancer_site
-                asyncio.create_task(generer_et_lancer_site(desc, ia_choisie))
-                return f"C'est noté Syndou. J'initie la création du site '{desc}' avec l'IA {ia_choisie.upper()}."
+                asyncio.create_task(generer_et_lancer_site(desc, model_choisi))
+                return f"Très bien Syndou. Je lance la création avec le modèle {model_choisi}. Je vous préviendrai dès que ce sera prêt."
             else:
-                return "Désolé Syndou, je n'ai pas compris. Indiquez-moi simplement avec quelle intelligence artificielle travailler : Gemini, Grok, Groq ou Ollama."
+                return "Modèle non reconnu. Quel modèle voulez-vous utiliser ? (Ex: Gemini, ExperientialLabs, Grok, Groq, Ollama, OpenAI) ou dites 'annuler'."
 
         # Détection de la demande de création de site/app/projet
         match_site = re.search(
@@ -413,7 +464,7 @@ async def demander_ia(texte):
             if description_site:
                 state.site_en_creation_desc = description_site
                 state.site_en_creation_attente_ia = True
-                return "Très bien Syndou. Avec quelle intelligence artificielle voulez-vous que je travaille pour concevoir ce site ? Gemini, Grok, Groq ou Ollama ?"
+                return f"J'ai bien noté votre demande pour '{description_site}'. Quel modèle d'IA souhaitez-vous utiliser pour générer le code ? (Gemini, ExperientialLabs, Grok, Groq, Ollama...)"
 
         # Raccourcis locaux
         if "iron man" in t_low or "ironman" in t_low:
@@ -427,6 +478,18 @@ async def demander_ia(texte):
         if "mode garde" in t_low or "surveillance" in t_low:
             etat = "off" if any(x in t_low for x in ["desactive", "désactive", "arrete", "arrête", "stop", "coupe", "fin"]) else "on"
             return f'{{"action": "mode_garde", "etat": "{etat}"}}'
+
+        if "sentinelle" in t_low or "cyber" in t_low:
+            etat = "off" if any(x in t_low for x in ["desactive", "désactive", "arrete", "arrête", "stop", "coupe", "fin"]) else "on"
+            return f'{{"action": "mode_sentinelle", "etat": "{etat}"}}'
+
+        if "mode lecteur" in t_low or "lecture" in t_low:
+            etat = "off" if any(x in t_low for x in ["desactive", "désactive", "arrete", "arrête", "stop", "coupe", "fin"]) else "on"
+            return f'{{"action": "mode_lecteur", "etat": "{etat}"}}'
+            
+        match_lire = re.search(r"(?:lis|lire)(?:\s+(?:le document|le fichier|le livre))?\s+(.+?\.(?:pdf|txt|docx?))", t_low)
+        if match_lire:
+            return f'{{"action": "lire_document", "fichier": "{match_lire.group(1).strip()}"}}'
 
         if any(kw in t_low for kw in ["qui est devant", "qui suis-je", "qui je suis", "reconnais-moi", "qui est là", "qui est devant la caméra", "qui vois-tu devant la caméra"]):
             return '{"action": "reconnaitre_personne"}'
@@ -608,7 +671,11 @@ async def demander_ia(texte):
             try:
                 return await _call_gemini()
             except Exception as e:
-                print(f"[CERVEAU] Erreur Gemini ({e}). Bascule rapide sur OpenAI.")
+                print(f"[CERVEAU] Erreur Gemini ({e}). Bascule rapide sur ExperientialLabs/OpenAI.")
+                if explabs_client:
+                    rep_explabs = await demander_explabs(texte)
+                    if rep_explabs:
+                        return rep_explabs
                 if openai_client:
                     rep_openai = await demander_openai(texte)
                     if rep_openai:

@@ -81,3 +81,5 @@ spotipy
 python-dotenv
 openai
 gradio_client
+psutil
+PyPDF2

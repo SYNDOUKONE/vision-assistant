@@ -148,6 +148,121 @@
       </svg>
     </button>
 
+    <!-- Bouton Radio -->
+    <button id="radio-launcher-btn" type="button" title="Ouvrir la Radio FM / Web">
+      📻 RADIO
+    </button>
+
+    <!-- ══ MODAL RADIO 3D INTERACTIF ══════════════════════════════════════════ -->
+    <div id="radio-modal" class="radio-hidden">
+      <div class="radio-modal-container">
+        <!-- Radio Header Bar -->
+        <div class="radio-header">
+          <div class="radio-logo">RADIO <span class="radio-logo-slash">//</span></div>
+          <div class="radio-header-right">
+            <div class="radio-fav-badge">♥ <span id="radio-fav-counter">0</span></div>
+            <div class="radio-header-badge" id="radio-header-badge">• 102.7 KIIS FM</div>
+            <button id="radio-close-btn" class="radio-close-btn" type="button" title="Fermer la radio">✕</button>
+          </div>
+        </div>
+
+        <!-- Radio Main Split View -->
+        <div class="radio-body">
+          <!-- Left Column: Explorer & Cards -->
+          <div class="radio-left-pane">
+            <div class="radio-pane-top">
+              <div class="radio-title-row">
+                <span class="radio-title-main">All Stations</span>
+                <span class="radio-count-badge" id="radio-count">302 stations</span>
+              </div>
+
+              <!-- Search input & Country Dropdown -->
+              <div class="radio-search-box">
+                <div class="radio-search-input-wrap">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <input id="radio-search-input" type="text" placeholder="Search stations, countries, tags..." />
+                </div>
+                <select id="radio-country-select" class="radio-country-select">
+                  <option value="All countries">All countries</option>
+                  <option value="Côte d'Ivoire">Côte d'Ivoire 🇨🇮</option>
+                  <option value="France">France 🇫🇷</option>
+                  <option value="The United States of America">United States 🇺🇸</option>
+                  <option value="United Kingdom">United Kingdom 🇬🇧</option>
+                  <option value="Senegal">Senegal 🇸🇳</option>
+                  <option value="Brazil">Brazil 🇧🇷</option>
+                  <option value="Japan">Japan 🇯🇵</option>
+                </select>
+              </div>
+
+              <!-- Continent Filter Pills -->
+              <div class="radio-filter-pills" id="radio-continent-filters">
+                <button class="radio-filter-pill active" data-val="All">All</button>
+                <button class="radio-filter-pill" data-val="N. America">🟡 N. America</button>
+                <button class="radio-filter-pill" data-val="S. America">🔴 S. America</button>
+                <button class="radio-filter-pill" data-val="Europe">🔵 Europe</button>
+                <button class="radio-filter-pill" data-val="Africa">🟢 Africa</button>
+                <button class="radio-filter-pill" data-val="Asia">🔴 Asia</button>
+              </div>
+
+              <!-- Genre Filter Pills -->
+              <div class="radio-filter-pills tag-pills" id="radio-tag-filters">
+                <button class="radio-filter-pill active" data-val="All">All</button>
+                <button class="radio-filter-pill" data-val="news">news</button>
+                <button class="radio-filter-pill" data-val="pop">pop</button>
+                <button class="radio-filter-pill" data-val="music">music</button>
+                <button class="radio-filter-pill" data-val="talk">talk</button>
+                <button class="radio-filter-pill" data-val="zouglou">zouglou</button>
+                <button class="radio-filter-pill" data-val="coupe-decale">coupé-décalé</button>
+                <button class="radio-filter-pill" data-val="généraliste">généraliste</button>
+              </div>
+            </div>
+
+            <!-- Scrollable Stations List -->
+            <div id="radio-cards-list" class="radio-cards-list"></div>
+          </div>
+
+          <!-- Right Column: 3D Globe -->
+          <div class="radio-right-pane">
+            <div id="radio-globe-container" class="radio-globe-container"></div>
+          </div>
+        </div>
+
+        <!-- Floating Bottom Player Bar -->
+        <div class="radio-bottom-bar">
+          <div class="radio-player-info">
+            <span class="radio-player-flag" id="radio-player-flag">🇺🇸</span>
+            <div class="radio-player-meta">
+              <div class="radio-player-title" id="radio-player-title">102.7 KIIS FM</div>
+              <div class="radio-player-sub" id="radio-player-sub">The United States of America · AAC</div>
+            </div>
+          </div>
+
+          <div class="radio-player-center">
+            <button id="radio-bottom-play-btn" class="radio-center-play-btn" type="button" aria-label="Play/Pause">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="radio-player-controls">
+            <div class="radio-volume-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              </svg>
+              <input id="radio-volume-slider" type="range" min="0" max="100" value="80" />
+            </div>
+            <button id="radio-heart-btn" class="radio-icon-btn" type="button" title="Favori">♡</button>
+          </div>
+        </div>
+
+        <div id="radio-toast" class="radio-toast"></div>
+      </div>
+    </div>
+
     <!-- Modal d'historique -->
     <div id="history-modal" class="history-hidden">
       <div class="history-content">

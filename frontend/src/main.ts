@@ -14,6 +14,7 @@ import { injectGestureButton } from "./gesture_control";
 import { showCarte, hideCarte } from "./carte3d";
 import { initWallpaperSystem } from "./wallpaper";
 import { vision3D } from "./vision3d_interactions";
+import { initRadioModule, openRadioModal, closeRadioModal, playStationByName } from "./radio";
 import "./style.css";
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -334,6 +335,23 @@ function connect(): void {
         vision3D.showModule("data_cube");
         return;
       }
+      if (data.action === "open_radio") {
+        openRadioModal();
+        return;
+      }
+      if (data.action === "close_radio") {
+        closeRadioModal();
+        return;
+      }
+      if (data.action === "play_radio") {
+        const station = (data as any).station || "";
+        if (station) {
+          playStationByName(station);
+        } else {
+          openRadioModal();
+        }
+        return;
+      }
       if (data.action === "hide_vision3d") {
         vision3D.hideCurrentModule();
         return;
@@ -457,6 +475,15 @@ injectGestureButton((data) => {
   }
 });
 initWallpaperSystem();
+initRadioModule();
+
+const radioLauncherBtn = document.getElementById("radio-launcher-btn");
+if (radioLauncherBtn) {
+  radioLauncherBtn.addEventListener("click", () => {
+    openRadioModal();
+  });
+}
+
 vision3D.init((data: any) => {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(data));
@@ -488,9 +515,12 @@ window.addEventListener("profileSelected", (e: Event) => {
   }, 800);
 });
 
-// Escape ferme la carte
+// Escape ferme la carte et la radio
 window.addEventListener("keydown", (e: KeyboardEvent) => {
-  if (e.key === "Escape") hideCarte();
+  if (e.key === "Escape") {
+    hideCarte();
+    closeRadioModal();
+  }
 });
 
 // Silence unused-import warning for showError

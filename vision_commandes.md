@@ -244,7 +244,19 @@
 
 ---
 
-## 🎭 Modes Spéciaux
+## 📚 Lecture de Documents & Livres
+
+| Commande                 | Exemple / Effet                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| Lire un fichier PDF/TXT  | `"Lis le document rapport.pdf"` / `"Fais-moi la lecture de fichier.txt"`                   |
+| Activer le mode Lecteur  | `"Active le mode Lecteur"` (Prépare l'IA à la lecture asynchrone)                           |
+| Arrêter la lecture       | `"Désactive le mode Lecteur"` / `"Arrête de lire"`                                           |
+
+> ⚠️ Les fichiers doivent se trouver sur votre **Bureau**, dans vos **Téléchargements** ou dans vos **Documents**.
+
+---
+
+## 🎭 Modes Spéciaux & Sécurité
 
 | Commande                          | Effet                                                  |
 | --------------------------------- | ------------------------------------------------------ |
@@ -253,6 +265,8 @@
 | `"Active le mode Analyse"`      | Dédié à l'analyse de données                       |
 | `"Active le mode Garde"`        | Lance la surveillance visuelle continue via webcam     |
 | `"Désactive le mode Garde"`    | Fin de la surveillance                                 |
+| `"Active le mode Sentinelle Cyber"` | Lance la surveillance réseau (Intrus Wi-Fi, Virus, CPU/RAM) |
+| `"Désactive la Sentinelle Cyber"` | Arrête la surveillance système et réseau            |
 
 ---
 
