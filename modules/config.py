@@ -90,7 +90,7 @@ if SPOTIPY_CLIENT_ID and SPOTIPY_CLIENT_ID != "VOTRE_ID_SPOTIFY":
     except Exception as e:
         print(f"[SPOTIFY] Erreur initialisation : {e}")
 
-MODELS_LIST  = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]
+MODELS_LIST  = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.6-flash", "gemini-3.5-flash"]
 CHOSEN_MODEL = MODELS_LIST[0]
 
 OLLAMA_URL    = "http://127.0.0.1:11434"

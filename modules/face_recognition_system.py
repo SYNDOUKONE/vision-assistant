@@ -366,20 +366,35 @@ async def reconnaitre_frame_direct(img_b64: str) -> dict:
                         pass
 
         prompt = (
-            "Voici l'image actuelle capturée par la caméra.\n"
-            "Compare attentivement le visage présent avec les photos de référence fournies.\n"
-            "Réponds STRICTEMENT au format JSON valide suivant, sans aucun texte autour :\n"
-            '{"identified": true, "name": "Nom de la personne", "confidence": 0.95, "relation": "..."} ou {"identified": false, "name": "Inconnu", "confidence": 0.0}'
+            "Tu es un système expert de reconnaissance faciale biométrique.\n"
+            "Voici les photos et noms des personnes mémorisées dans la base de données ci-dessus.\n"
+            "Analyse le visage visible sur la DERNIÈRE image fournie (flux caméra en direct) et compare-le aux profils enregistrés.\n"
+            "Si la personne correspond à l'un des profils enregistrés (même sous un angle ou éclairage légèrement différent), identifie-la avec certitude.\n"
+            "Réponds STRICTEMENT au format JSON valide suivant, sans balises markdown ni texte autour :\n"
+            '{"identified": true, "name": "Nom Exact", "confidence": 0.95, "relation": "..."}\n'
+            'ou si ce n\'est aucune des personnes enregistrées :\n'
+            '{"identified": false, "name": "Inconnu", "confidence": 0.0}'
         )
         contents.append(prompt)
         contents.append(current_img)
 
         from modules.config import gemini_client, MODELS_LIST
-        response = await asyncio.to_thread(
-            gemini_client.models.generate_content,
-            model=MODELS_LIST[0] if MODELS_LIST else "gemini-2.5-flash",
-            contents=contents
-        )
+        candidate_models = MODELS_LIST if MODELS_LIST else ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.6-flash"]
+
+        response = None
+        for cand in candidate_models:
+            try:
+                response = await asyncio.to_thread(
+                    gemini_client.models.generate_content,
+                    model=cand,
+                    contents=contents
+                )
+                if response and response.text:
+                    break
+            except Exception as e_cand:
+                print(f"[RECONNAISSANCE] Modèle {cand} indisponible : {e_cand}")
+                continue
+
         if response and response.text:
             text = response.text.strip()
             if "```json" in text:
@@ -387,6 +402,15 @@ async def reconnaitre_frame_direct(img_b64: str) -> dict:
             elif "```" in text:
                 text = text.split("```", 1)[1].split("```", 1)[0].strip()
             data = json.loads(text)
+            
+            # Enrichir la relation si trouvée dans la base
+            if data.get("identified") and data.get("name"):
+                matched_name = data["name"]
+                for p_nom, p_info in personnes.items():
+                    if p_nom.lower() == matched_name.lower():
+                        data["name"] = p_nom
+                        data["relation"] = p_info.get("relation", "")
+                        break
             return data
     except Exception as e:
         print(f"[RECONNAISSANCE FRAME DIRECT ERROR] {e}")
