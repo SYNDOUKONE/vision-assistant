@@ -226,10 +226,7 @@ export function injectGestureButton(sendWsMsg: (data: any) => void) {
   btn.id = "gesture-control-button";
   btn.title = "Activer le contrôle par gestes (Index sur la bouche 🤫 ou Poing ✊ pour couper l'audio)";
   btn.textContent = "✋ Gestes : Inactifs";
-  btn.style.cssText =
-    "position:fixed;bottom:18px;left:320px;z-index:9999;padding:8px 14px;" +
-    "background:rgba(255, 215, 0, 0.12);color:rgba(255,255,255,0.6);border:1px solid rgba(255, 215, 0, 0.3);border-radius:20px;" +
-    "font-family:sans-serif;cursor:pointer;font-size:11px;letter-spacing:1px;text-transform:lowercase;backdrop-filter:blur(10px);transition:all 0.3s ease;";
+  btn.style.cssText = "display:none;";
 
   btn.onmouseover = () => { btn.style.background = "rgba(255, 215, 0, 0.25)"; btn.style.color = "#fff"; };
   btn.onmouseout  = () => { btn.style.background = isGestureControlRunning() ? "rgba(46, 204, 113, 0.2)" : "rgba(255, 215, 0, 0.12)"; };

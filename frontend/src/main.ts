@@ -15,6 +15,7 @@ import { showCarte, hideCarte } from "./carte3d";
 import { initWallpaperSystem } from "./wallpaper";
 import { vision3D } from "./vision3d_interactions";
 import { initRadioModule, openRadioModal, closeRadioModal, playStationByName } from "./radio";
+import { initDrawer } from "./drawer";
 import "./style.css";
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -467,6 +468,7 @@ textInputEl.addEventListener("keydown", (e: KeyboardEvent) => {
 setConnected(false);
 applyState("idle");
 setMuted(false);
+initDrawer();
 injectVisionButton();
 injectWebcamButton();
 injectGestureButton((data) => {
@@ -503,6 +505,16 @@ window.addEventListener("profileSelected", (e: Event) => {
   // Update assistant label
   const label = document.getElementById("assistant-label");
   if (label) label.textContent = activeProfile === "adjoua" ? "ADJOUA" : "VISION";
+
+  const drawerBrandTitle = document.getElementById("drawer-brand-title");
+  if (drawerBrandTitle) {
+    drawerBrandTitle.innerHTML = activeProfile === "adjoua" ? 'ADJOUA <span class="drawer-version">v2.0</span>' : 'VISION <span class="drawer-version">v2.0</span>';
+  }
+
+  const drawerActiveProfileLabel = document.getElementById("drawer-active-profile-label");
+  if (drawerActiveProfileLabel) {
+    drawerActiveProfileLabel.textContent = activeProfile === "adjoua" ? "Assistant : ADJOUA (Musique & Ambiance)" : "Assistant : VISION (Généraliste & Code)";
+  }
 
   // Start WebSocket (connect to backend)
   connect();

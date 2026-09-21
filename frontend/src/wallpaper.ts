@@ -281,7 +281,7 @@ function updatePresetsUI(activeSrc: string): void {
 }
 
 // ── Panneau open/close ────────────────────────────────────────────────────────
-function openWallpaperPanel(): void {
+export function openWallpaperPanel(): void {
   if (!wallpaperPanelEl) return;
   wallpaperPanelEl.classList.remove("wallpaper-panel-hidden");
   wallpaperPanelEl.classList.add("wallpaper-panel-visible");
