@@ -464,6 +464,41 @@ textInputEl.addEventListener("keydown", (e: KeyboardEvent) => {
   }
 });
 
+function initActiveProfile(profileName: "vision" | "adjoua"): void {
+  activeProfile = profileName;
+
+  // Create the orb with the right palette
+  const palette: OrbPalette = activeProfile === "adjoua" ? PALETTE_ADJOUA : PALETTE_VISION;
+  if (orb) orb.destroy();
+  orb = createOrb(canvas, palette);
+
+  // Update assistant label
+  const label = document.getElementById("assistant-label");
+  if (label) label.textContent = activeProfile === "adjoua" ? "ADJOUA" : "VISION";
+
+  const drawerBrandTitle = document.getElementById("drawer-brand-title");
+  if (drawerBrandTitle) {
+    drawerBrandTitle.innerHTML = activeProfile === "adjoua" ? 'ADJOUA <span class="drawer-version">v2.0</span>' : 'VISION <span class="drawer-version">v2.0</span>';
+  }
+
+  const drawerActiveProfileLabel = document.getElementById("drawer-active-profile-label");
+  if (drawerActiveProfileLabel) {
+    drawerActiveProfileLabel.textContent = activeProfile === "adjoua" ? "Assistant : ADJOUA (Musique & Ambiance)" : "Assistant : VISION (Généraliste & Code)";
+  }
+
+  // Start WebSocket (connect to backend) if not already connected
+  if (!ws || ws.readyState === WebSocket.CLOSED) {
+    connect();
+  }
+
+  // Notify backend of profile choice once connected
+  setTimeout(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "set_profile", profile: activeProfile }));
+    }
+  }, 800);
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 setConnected(false);
 applyState("idle");
@@ -492,39 +527,15 @@ vision3D.init((data: any) => {
   }
 });
 
+// Always initialize active profile & 3D Orb immediately on startup
+const savedProfile = (localStorage.getItem("vision_profile") as "vision" | "adjoua") || "vision";
+initActiveProfile(savedProfile);
+
 // Listen for profile selection (from the profile screen HTML/JS)
 window.addEventListener("profileSelected", (e: Event) => {
   const evt = e as CustomEvent<{ profile: string }>;
-  activeProfile = evt.detail.profile as "vision" | "adjoua";
-
-  // Create the orb with the right palette
-  const palette: OrbPalette = activeProfile === "adjoua" ? PALETTE_ADJOUA : PALETTE_VISION;
-  if (orb) orb.destroy();
-  orb = createOrb(canvas, palette);
-
-  // Update assistant label
-  const label = document.getElementById("assistant-label");
-  if (label) label.textContent = activeProfile === "adjoua" ? "ADJOUA" : "VISION";
-
-  const drawerBrandTitle = document.getElementById("drawer-brand-title");
-  if (drawerBrandTitle) {
-    drawerBrandTitle.innerHTML = activeProfile === "adjoua" ? 'ADJOUA <span class="drawer-version">v2.0</span>' : 'VISION <span class="drawer-version">v2.0</span>';
-  }
-
-  const drawerActiveProfileLabel = document.getElementById("drawer-active-profile-label");
-  if (drawerActiveProfileLabel) {
-    drawerActiveProfileLabel.textContent = activeProfile === "adjoua" ? "Assistant : ADJOUA (Musique & Ambiance)" : "Assistant : VISION (Généraliste & Code)";
-  }
-
-  // Start WebSocket (connect to backend)
-  connect();
-
-  // Notify backend of profile choice once connected
-  setTimeout(() => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "set_profile", profile: activeProfile }));
-    }
-  }, 800);
+  const p = (evt.detail?.profile as "vision" | "adjoua") || "vision";
+  initActiveProfile(p);
 });
 
 // Escape ferme la carte et la radio
